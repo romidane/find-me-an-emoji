@@ -80,7 +80,9 @@ init flag url key =
       , home = { title = "Likedy split" }
       , game = { board = [] }
       }
-    , Cmd.batch [ Task.succeed (GameMsg Game.NewGame) |> Task.perform identity ]
+    , Cmd.batch
+        [ Task.succeed (GameMsg Game.NewGame) |> Task.perform identity
+        ]
     )
 
 
@@ -116,10 +118,12 @@ update msg model =
 
         GameMsg newMsg ->
             let
-                ( gameModel, _ ) =
+                ( gameModel, cmd ) =
                     Game.update newMsg model.game
             in
-            ( { model | game = gameModel }, Cmd.none )
+            ( { model | game = gameModel }
+            , Cmd.map (\a -> GameMsg a) cmd
+            )
 
 
 

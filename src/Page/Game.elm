@@ -14,22 +14,35 @@ import String
 -- MODEL
 
 
-type Emoticon
-    = GRINNING_FACE
-    | TEARS_OF_JOY_FACE
-    | SMIRKING_FACE
-
-
 type alias Model =
     { board : List Card
     }
 
 
+type alias Id =
+    Int
+
+
 type alias Card =
-    { id : Int
+    { id : Id
     , selected : Bool
     , emoticon : Emoticon
     }
+
+
+type Emoticon
+    = GrinningFace
+    | TearsOfJoyFace
+    | SmirkingFace
+    | LookOfTriumphFace
+    | RelievedFace
+    | KissingFace
+    | HeartShapedEyesFace
+    | UnamusedFace
+    | SleepyFace
+    | FearfulFace
+    | StuckOutTongueClosedEyesFace
+    | DizzyFace
 
 
 
@@ -38,55 +51,141 @@ type alias Card =
 
 type Msg
     = NewGame
-    | NewEmoticon Emoticon
+    | NewCards (List Emoticon)
     | SelectCard Int
-
-
-defaultList =
-    [ Card 1 False GRINNING_FACE, Card 2 False TEARS_OF_JOY_FACE, Card 3 False SMIRKING_FACE ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         NewGame ->
-            ( { model | board = defaultList }, Cmd.none )
-
-        NewEmoticon e ->
-            ( model, Cmd.none )
+            ( model, Random.generate NewCards (Random.list 12 cardGenerator) )
 
         SelectCard id ->
-            ( { model | board = model.board }, Cmd.none )
+            ( { model | board = handleSelection id model.board }, Cmd.none )
+
+        NewCards list ->
+            ( { model | board = generateCardList list }, Cmd.none )
+
+
+generateCardList : List Emoticon -> List Card
+generateCardList list =
+    List.indexedMap (\index emoticon -> Card index False emoticon) list
+
+
+cardGenerator : Random.Generator Emoticon
+cardGenerator =
+    Random.uniform GrinningFace
+        [ TearsOfJoyFace
+        , SmirkingFace
+        , LookOfTriumphFace
+        , RelievedFace
+        , KissingFace
+        , HeartShapedEyesFace
+        , UnamusedFace
+        , SleepyFace
+        , FearfulFace
+        , StuckOutTongueClosedEyesFace
+        , DizzyFace
+        ]
+
+
+handleSelection : Id -> List Card -> List Card
+handleSelection id =
+    List.map
+        (\card ->
+            if card.id == id then
+                { card | selected = not card.selected }
+
+            else
+                card
+        )
 
 
 
 -- VIEW
 
 
-viewEmoticon : Emoticon -> String
-viewEmoticon emoticon =
-    case emoticon of
-        GRINNING_FACE ->
-            "😁"
-
-        TEARS_OF_JOY_FACE ->
-            "😂"
-
-        SMIRKING_FACE ->
-            "😏"
-
-
 view : Model -> (Msg -> msg) -> Html msg
 view model appMsg =
     div []
         [ h1 [] [ text "Let's play" ]
-        , div [ class "grid" ] (List.map (\card -> viewCell card appMsg) model.board)
+        , div [ class "grid" ] (List.map (\card -> viewCard card appMsg) model.board)
+        , button [ onClick (appMsg NewGame) ] [ text "Click" ]
         ]
 
 
-viewCell : Card -> (Msg -> msg) -> Html msg
-viewCell card appMsg =
-    div [ class "pure-u-1-4" ]
-        [ div [ class "c-card", id (String.fromInt card.id), onClick (appMsg (SelectCard card.id)) ]
+viewEmoticon : Emoticon -> String
+viewEmoticon emoticon =
+    case emoticon of
+        GrinningFace ->
+            "😁"
+
+        TearsOfJoyFace ->
+            "😂"
+
+        SmirkingFace ->
+            "😏"
+
+        LookOfTriumphFace ->
+            "😤"
+
+        RelievedFace ->
+            "😌"
+
+        KissingFace ->
+            "😚"
+
+        HeartShapedEyesFace ->
+            "😍"
+
+        UnamusedFace ->
+            "😒"
+
+        SleepyFace ->
+            "😪"
+
+        FearfulFace ->
+            "😨"
+
+        StuckOutTongueClosedEyesFace ->
+            "😝"
+
+        DizzyFace ->
+            "😵"
+
+
+viewCard : Card -> (Msg -> msg) -> Html msg
+viewCard card appMsg =
+    section [ class "pure-u-1-4" ]
+        [ div
+            [ class
+                (cssClassNames
+                    [ ( "c-card", True )
+                    , ( "is-selected", card.selected )
+                    ]
+                )
+            , id (String.fromInt card.id)
+            , onClick (appMsg (SelectCard card.id))
+            ]
             [ span [] [ text (viewEmoticon card.emoticon) ] ]
         ]
+
+
+
+-- Utilities
+
+
+cssClassNames : List ( String, Bool ) -> String
+cssClassNames list =
+    List.foldl
+        (\( key, value ) acc ->
+            if value == True then
+                acc ++ " " ++ key
+
+            else
+                acc
+        )
+        ""
+        list
+        |> String.trimLeft
