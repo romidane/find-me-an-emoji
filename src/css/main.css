@@ -76,6 +76,8 @@ html {
   border: solid 1px #d4d9dd;
   background-color: #eaecee;
   cursor: pointer;
+  user-select: none;
+  transition: border ease 300ms;
 }
 
 .c-card.is-selected {
