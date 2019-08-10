@@ -8,14 +8,50 @@ html {
   box-sizing: inherit;
 }
 
+body {
+  background-color: aliceblue;
+}
+
+@media (min-width: 48em) {
+  /* We increase the body font size */
+  body {
+    font-size: 16px;
+  }
+}
+
+/**************************************
+**** Objects
+***************************************/
+
 .o-container {
   width: 100%;
   max-width: 960px;
   margin: 0 auto;
 }
 
+.o-page {
+  padding: 2em 0;
+  color: #2c3e50;
+}
+
+/**************************************
+**** Components
+***************************************/
+
+/* ---------- Headings ---------- */
+
 .c-heading-alpha {
   font-size: 2em;
+}
+
+.c-heading-bravo {
+  font-size: 1.5em;
+}
+
+/* ---------- Buttons ---------- */
+
+.c-btn--pink {
+  background-color: #e700ab;
 }
 
 .c-btn-group {
@@ -27,19 +63,8 @@ html {
   display: inline-block;
 }
 
-.c-btn {
-  display: inline-block;
-  background-color: blue;
-  color: white;
-  border: solid 2px #fff;
-  font-size: 0.9em;
-  line-height: 1;
-  padding: 0.3em;
-  text-align: center;
-  margin: 1em;
-}
+/* ---------- Page menu ---------- */
 
-/* Page menu */
 .c-page-menu {
   padding: 0.5em;
   text-align: center;
@@ -67,29 +92,7 @@ html {
   color: #aecfe5;
 }
 
-.c-card {
-  height: 200px;
-  font-size: 4em;
-  text-align: center;
-  vertical-align: middle;
-  line-height: 200px;
-  border: solid 1px #d4d9dd;
-  background-color: #eaecee;
-  cursor: pointer;
-  user-select: none;
-  transition: border ease 300ms;
-}
-
-.c-card.is-selected {
-  border: solid 1px #007eff;
-}
-
 @media (min-width: 48em) {
-  /* We increase the body font size */
-  body {
-    font-size: 16px;
-  }
-
   /* We can align the menu header to the left, but float the
     menu items to the right. */
   .c-page-menu {
@@ -98,4 +101,123 @@ html {
   .c-page-menu ul {
     float: right;
   }
+}
+
+/* ---------- Card Component --------- */
+.c-header {
+  padding: 1em 1.5em;
+  background-color: #2d3e50;
+  /* border-top-right-radius: 10px; */
+  /* border-top-left-radius: 10px; */
+  color: #fff;
+}
+
+/* ---------- Card Component --------- */
+.c-card {
+  height: 120px;
+  font-size: 4em;
+  text-align: center;
+  vertical-align: middle;
+  line-height: 120px;
+  border: solid 1px #d4d9dd;
+  background-color: #eaecee;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color ease-in-out 200ms;
+}
+
+.c-card.is-selected {
+  background-color: #d4d9dd;
+  border: solid 1px #eaecee;
+}
+
+/* ---------- Sidebar --------- */
+
+.c-sidebar {
+  padding: 1em;
+}
+
+/* ---------- Timer metter --------- */
+
+.c-timer-meter {
+  height: 20px;
+  position: relative;
+  background: #555;
+  border-radius: 25px;
+  padding: 10px;
+  box-shadow: inset 0 -1px 1px rgba(255, 255, 255, 0.3);
+}
+
+.c-timer-meter > span {
+  display: block;
+  height: 100%;
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+  border-top-left-radius: 20px;
+  border-bottom-left-radius: 20px;
+  background-color: #e700ab;
+  box-shadow: inset 0 2px 9px rgba(255, 255, 255, 0.3),
+    inset 0 -2px 6px rgba(255, 255, 255, 0.3);
+  position: absolute;
+  overflow: hidden;
+  width: 50%;
+  left: 0;
+  top: 0;
+}
+
+.c-countdown {
+  position: relative;
+  height: 40px;
+  width: 40px;
+  text-align: center;
+}
+
+.c-countdown-number {
+  color: #2c3e50;
+  display: inline-block;
+  line-height: 40px;
+}
+
+svg {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 40px;
+  height: 40px;
+  transform: rotateY(-180deg) rotateZ(-90deg);
+}
+
+svg circle {
+  stroke-dasharray: 113px;
+  stroke-dashoffset: 0px;
+  stroke-linecap: round;
+  stroke-width: 2px;
+  stroke: #2c3e50;
+  fill: none;
+  animation: countdown 10s linear infinite forwards;
+}
+
+@keyframes countdown {
+  from {
+    stroke-dashoffset: 0px;
+  }
+  to {
+    stroke-dashoffset: 113px;
+  }
+}
+
+/**************************************
+**** Utilities
+***************************************/
+
+.u-ta-right {
+  text-align: right;
+}
+
+.u-no-margin {
+  margin: 0;
+}
+
+.u-mb-charlie {
+  margin-bottom: 1em;
 }

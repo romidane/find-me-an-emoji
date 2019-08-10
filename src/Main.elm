@@ -5,9 +5,11 @@ import Browser.Navigation as Nav
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
+import Page.Error404 as Error404
 import Page.Game as Game
 import Page.Home as Home
 import Task
+import Time
 import Url
 import Url.Parser exposing (Parser, int, map, oneOf, parse, s, top)
 
@@ -72,16 +74,22 @@ type alias Model =
     }
 
 
+
+-- type Model
+--     = Home Home.Model
+--     | Game Game.Model
+
+
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flag url key =
-    -- ( Model key (routeFromUrl url), Cmd.none )
     ( { key = key
       , url = routeFromUrl url
       , home = { title = "Likedy split" }
-      , game = { board = [] }
+      , game = { board = [], currentLevel = 1, time = Time.millisToPosix 0, zone = Time.utc }
       }
     , Cmd.batch
         [ Task.succeed (GameMsg Game.NewGame) |> Task.perform identity
+        , Cmd.map GameMsg (Task.perform Game.AdjustTimeZone Time.here)
         ]
     )
 
@@ -127,12 +135,14 @@ update msg model =
 
 
 
+-- changeRouteTo -> Route -> M
 -- SUBSCRIPTIONS
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
+subscriptions model =
+    Sub.batch
+        [ Sub.map GameMsg (Game.subscriptions model.game) ]
 
 
 
@@ -187,16 +197,11 @@ viewPage model =
     div [ class "o-container" ]
         [ case model.url of
             Home ->
-                Home.view model.home HomeMsg
+                Html.map HomeMsg (Home.view model.home)
 
             Game ->
-                Game.view model.game GameMsg
+                Html.map GameMsg (Game.view model.game)
 
             NotFound ->
-                pageNotFound
+                Error404.view
         ]
-
-
-pageNotFound : Html msg
-pageNotFound =
-    div [] [ text "The page you are looking for does not exit" ]

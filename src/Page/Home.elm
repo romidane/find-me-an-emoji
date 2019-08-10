@@ -1,4 +1,4 @@
-module Page.Home exposing (Model, Msg(..), view)
+module Page.Home exposing (Model, Msg(..), init, view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -6,6 +6,13 @@ import Html.Attributes exposing (..)
 
 
 -- MODEL
+
+
+init : () -> ( Model, Cmd Msg )
+init _ =
+    ( { title = "Likedy split" }
+    , Cmd.none
+    )
 
 
 type alias Model =
@@ -19,8 +26,8 @@ type Msg
 
 
 -- VIEW
--- view : Model -> Html Msg
 
 
-view model msg =
+view : Model -> Html Msg
+view model =
     div [] [ text model.title ]
