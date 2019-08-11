@@ -84,8 +84,20 @@ init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flag url key =
     ( { key = key
       , url = routeFromUrl url
-      , home = { title = "Likedy split" }
-      , game = { board = [], currentLevel = 1, time = Time.millisToPosix 0, zone = Time.utc }
+      , home =
+            { title = "Likedy split"
+            }
+      , game =
+            { board = []
+            , currentLevel = Game.Level 1 0 0
+            , time = Time.millisToPosix 0
+            , zone = Time.utc
+            , config =
+                { gameTime = 15
+                , sneakPeakTime = 3
+                , numberOfCards = 16
+                }
+            }
       }
     , Cmd.batch
         [ Task.succeed (GameMsg Game.NewGame) |> Task.perform identity
