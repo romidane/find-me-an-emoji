@@ -105,8 +105,8 @@ init _ =
       , time = Time.millisToPosix 0
       , zone = Time.utc
       , config =
-            { gameTime = 30
-            , sneakPeakTime = 3
+            { gameTime = 45
+            , sneakPeakTime = 4
             , numberOfCards = 20
             }
       , currentLevel = Level 1 0 0
@@ -276,7 +276,7 @@ updateCardsTime config targets =
                 resetRevealTime =
                     { conf | revealTime = 0 }
 
-                updateRevealTime =
+                updatedRevealTime =
                     { conf | revealTime = conf.revealTime + 1 }
             in
             case card of
@@ -285,14 +285,14 @@ updateCardsTime config targets =
                         HiddenCard resetRevealTime
 
                     else
-                        RelievedCard updateRevealTime
+                        RelievedCard updatedRevealTime
 
                 SelectedCard cardConfig ->
                     if timeExpired then
                         HiddenCard resetRevealTime
 
                     else
-                        SelectedCard updateRevealTime
+                        SelectedCard updatedRevealTime
 
                 _ ->
                     card

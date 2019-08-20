@@ -5,9 +5,9 @@ import Browser.Navigation as Nav
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
+import Page.About as About
 import Page.Error404 as Error404
 import Page.Game as Game
-import Page.Home as Home
 import Task
 import Time
 import Url
@@ -34,7 +34,7 @@ main =
 
 
 type Route
-    = Home
+    = About
     | Game
     | NotFound
 
@@ -42,8 +42,8 @@ type Route
 route : Parser (Route -> a) a
 route =
     oneOf
-        [ map Home top
-        , map Game (s "game")
+        [ map About (s "about")
+        , map Game top
         ]
 
 
@@ -69,7 +69,7 @@ routeFromUrl =
 type alias Model =
     { key : Nav.Key
     , url : Route
-    , home : Home.Model
+    , about : About.Model
     , game : Game.Model
     }
 
@@ -80,17 +80,17 @@ init flag url key =
         ( gameModel, gameMsg ) =
             Game.init ()
 
-        ( homeModel, homeMsg ) =
-            Home.init ()
+        ( aboutModel, aboutMsg ) =
+            About.init ()
     in
     ( { key = key
       , url = routeFromUrl url
-      , home = homeModel
+      , about = aboutModel
       , game = gameModel
       }
     , Cmd.batch
         [ Cmd.map GameMsg gameMsg
-        , Cmd.map HomeMsg homeMsg
+        , Cmd.map AboutMsg aboutMsg
         ]
     )
 
@@ -102,7 +102,7 @@ init flag url key =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
-    | HomeMsg Home.Msg
+    | AboutMsg About.Msg
     | GameMsg Game.Msg
 
 
@@ -122,7 +122,7 @@ update msg model =
             , Cmd.none
             )
 
-        HomeMsg _ ->
+        AboutMsg _ ->
             ( model, Cmd.none )
 
         GameMsg newMsg ->
@@ -164,8 +164,8 @@ viewNavigation model =
             [ a [ class "pure-menu-heading", href "/" ]
                 [ text "Find me" ]
             , ul [ class "pure-menu-list" ]
-                [ viewLink "/" "Home" (model.url == Home)
-                , viewLink "/game" "Game" (model.url == Game)
+                [ viewLink "/" "Home" (model.url == Game)
+                , viewLink "/about" "About" (model.url == About)
                 ]
             ]
         ]
@@ -191,8 +191,8 @@ viewPage : Model -> Html Msg
 viewPage model =
     div [ class "o-container" ]
         [ case model.url of
-            Home ->
-                Html.map HomeMsg (Home.view model.home)
+            About ->
+                Html.map AboutMsg (About.view model.about)
 
             Game ->
                 Html.map GameMsg (Game.view model.game)

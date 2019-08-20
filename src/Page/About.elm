@@ -1,4 +1,4 @@
-module Page.Home exposing (Model, Msg(..), init, view)
+module Page.About exposing (Model, Msg(..), init, view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
