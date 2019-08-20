@@ -38,7 +38,7 @@ type alias LevelConfig =
 
 
 type alias Model =
-    { board : List Card
+    { board : List (Card CardConfig)
     , time : Time.Posix
     , zone : Time.Zone
     , config : LevelConfig
@@ -52,13 +52,34 @@ type alias CardId =
     Int
 
 
-type alias Card =
+type alias CardConfig =
     { id : CardId
-    , selected : Bool
     , emoticon : Emoticon
     , revealTime : Int
-    , matched : Bool
     }
+
+
+type Card config
+    = RelievedCard config
+    | SelectedCard config
+    | HiddenCard config
+    | MatchedCard config
+
+
+getCardConfig : Card CardConfig -> CardConfig
+getCardConfig card =
+    case card of
+        RelievedCard config ->
+            config
+
+        SelectedCard config ->
+            config
+
+        HiddenCard config ->
+            config
+
+        MatchedCard config ->
+            config
 
 
 type Emoticon
@@ -112,6 +133,7 @@ type Msg
     | AdjustTimeZone Time.Zone
     | UpdateLevelCompletion
     | StartGame
+    | NextLevel
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -119,6 +141,13 @@ update msg model =
     case msg of
         NewGame ->
             ( { model | currentLevel = Level 1 0 0 }
+            , Cmd.batch
+                [ Random.generate PairOfCards (Random.pair cardGenerator cardGenerator)
+                ]
+            )
+
+        NextLevel ->
+            ( { model | currentLevel = updateLevel model.currentLevel }
             , Cmd.batch
                 [ Random.generate PairOfCards (Random.pair cardGenerator cardGenerator)
                 ]
@@ -169,16 +198,48 @@ update msg model =
 
                 target1InBoard =
                     model.board
-                        |> List.filter (\card -> card.emoticon == target1)
+                        |> List.filter
+                            (\card ->
+                                let
+                                    config =
+                                        getCardConfig card
+                                in
+                                config.emoticon == target1
+                            )
 
                 target2InBoard =
                     model.board
-                        |> List.filter (\card -> card.emoticon == target2)
+                        |> List.filter
+                            (\card ->
+                                let
+                                    config =
+                                        getCardConfig card
+                                in
+                                config.emoticon == target2
+                            )
 
-                allTarget1Complete =
-                    target1InBoard |> List.all (\card -> card.matched)
+                allTargetsComplete =
+                    List.append target2InBoard target1InBoard
+                        |> List.all
+                            (\card ->
+                                case card of
+                                    MatchedCard _ ->
+                                        True
+
+                                    _ ->
+                                        False
+                            )
             in
-            ( model, Cmd.none )
+            if allTargetsComplete then
+                ( model, Task.succeed NextLevel |> Task.perform identity )
+
+            else
+                ( model, Cmd.none )
+
+
+updateLevel : Level -> Level
+updateLevel (Level num _ _) =
+    Level (num + 1) 0 0
 
 
 updateLevelTime : LevelConfig -> Level -> Level
@@ -201,52 +262,75 @@ updateLevelTime config (Level num gameTime sneakPeakTime) =
     Level num timeElapsed sneakPeakElapsed
 
 
-updateCardsTime : LevelConfig -> CurrentTargets -> List Card -> List Card
+updateCardsTime : LevelConfig -> CurrentTargets -> List (Card CardConfig) -> List (Card CardConfig)
 updateCardsTime config targets =
     List.map
         (\card ->
             let
-                isATarget =
-                    cardIsATarget targets card
+                conf =
+                    getCardConfig card
 
                 timeExpired =
-                    card.revealTime > config.sneakPeakTime
+                    conf.revealTime > config.sneakPeakTime
+
+                resetRevealTime =
+                    { conf | revealTime = 0 }
+
+                updateRevealTime =
+                    { conf | revealTime = conf.revealTime + 1 }
             in
-            if card.selected && not isATarget && not timeExpired then
-                { card | revealTime = card.revealTime + 1 }
+            case card of
+                RelievedCard cardConfig ->
+                    if timeExpired then
+                        HiddenCard resetRevealTime
 
-            else if card.selected && timeExpired then
-                { card | revealTime = 0, selected = False }
+                    else
+                        RelievedCard updateRevealTime
 
-            else
-                card
+                SelectedCard cardConfig ->
+                    if timeExpired then
+                        HiddenCard resetRevealTime
+
+                    else
+                        SelectedCard updateRevealTime
+
+                _ ->
+                    card
         )
 
 
-updateCardSelection : CardId -> CurrentTargets -> List Card -> List Card
+updateCardSelection : CardId -> CurrentTargets -> List (Card CardConfig) -> List (Card CardConfig)
 updateCardSelection id targets =
     List.map
         (\card ->
-            if card.id == id then
+            let
+                config =
+                    getCardConfig card
+            in
+            if config.id == id then
                 if cardIsATarget targets card then
-                    { card | selected = True, revealTime = 0 }
+                    MatchedCard { config | revealTime = 0 }
 
                 else
-                    { card | selected = not card.selected }
+                    SelectedCard config
 
             else
                 card
         )
 
 
-cardIsATarget : CurrentTargets -> Card -> Bool
+cardIsATarget : CurrentTargets -> Card CardConfig -> Bool
 cardIsATarget ( target1, target2 ) card =
-    List.member card.emoticon [ target1, target2 ]
+    let
+        config =
+            getCardConfig card
+    in
+    List.member config.emoticon [ target1, target2 ]
 
 
-generateCardList : List Emoticon -> List Card
+generateCardList : List Emoticon -> List (Card CardConfig)
 generateCardList list =
-    List.indexedMap (\index emoticon -> Card index False emoticon 2 False) list
+    List.indexedMap (\index emoticon -> RelievedCard { id = index, emoticon = emoticon, revealTime = 2 }) list
 
 
 listOfEmoticons : List Emoticon
@@ -309,7 +393,7 @@ view model =
             [ div [ class "pure-u-2-3" ]
                 [ div [ class "c-game-container" ]
                     [ viewStart model
-                    , div [ class "pure-g" ] (List.map (\card -> section [ class "pure-u-1-5" ] [ viewCard card model ]) model.board)
+                    , div [ class "pure-g" ] (List.map (\card -> section [ class "pure-u-1-5" ] [ viewCard card ]) model.board)
                     , viewGameOver model
                     ]
                 ]
@@ -397,27 +481,34 @@ viewEmoticon emoticon =
             "🙈"
 
 
-viewCard : Card -> Model -> Html Msg
-viewCard card model =
-    let
-        (Level level _ currentSneakPeakTime) =
-            model.currentLevel
-    in
+viewCard : Card CardConfig -> Html Msg
+viewCard card =
+    case card of
+        SelectedCard config ->
+            viewCardItem [ ( "is-selected", True ) ] config
+
+        HiddenCard config ->
+            viewCardItem [ ( "is-fliped", True ) ] config
+
+        RelievedCard config ->
+            viewCardItem [] config
+
+        MatchedCard config ->
+            viewCardItem [ ( "is-matched", True ) ] config
+
+
+viewCardItem : List ( String, Bool ) -> CardConfig -> Html Msg
+viewCardItem css config =
     div
         [ class
-            (cssClassNames
-                [ ( "c-card", True )
-                , ( "is-selected", card.selected )
-                , ( "is-fliped", not card.selected && model.config.sneakPeakTime == currentSneakPeakTime )
-                ]
-            )
-        , id (String.fromInt card.id)
-        , onClick (SelectCard card.id)
+            (cssClassNames (List.append [ ( "c-card", True ) ] css))
+        , id (String.fromInt config.id)
+        , onClick (SelectCard config.id)
         ]
         [ div [ class "c-card-inner" ]
             [ div [ class "c-card-front" ]
                 [ span []
-                    [ text (viewEmoticon card.emoticon) ]
+                    [ text (viewEmoticon config.emoticon) ]
                 ]
             , div [ class "c-card-back" ]
                 [ span []
@@ -471,10 +562,17 @@ viewEmojiTargets : Model -> Html msg
 viewEmojiTargets model =
     div [ class "pure-g" ]
         [ div [ class "pure-u-1" ]
-            [ p [ class "c-text" ] [ text "Find all of the following emoticons before the time runs out!" ] ]
+            [ p [ class "c-text" ]
+                [ text "Find all of the following emoticons before the time runs out!" ]
+            ]
         , div [ class "pure-u-1-2" ]
-            [ span [ class "c-icon__emoticon" ] [ text (viewEmoticon (Tuple.first model.currentTargets)) ] ]
-        , div [ class "pure-u-1-2" ] [ span [ class "c-icon__emoticon" ] [ text (viewEmoticon (Tuple.second model.currentTargets)) ] ]
+            [ span [ class "c-icon__emoticon" ]
+                [ text (viewEmoticon (Tuple.first model.currentTargets)) ]
+            ]
+        , div [ class "pure-u-1-2" ]
+            [ span [ class "c-icon__emoticon" ]
+                [ text (viewEmoticon (Tuple.second model.currentTargets)) ]
+            ]
         ]
 
 

@@ -146,6 +146,11 @@ body {
   border: solid 1px #eaecee;
 }
 
+.c-card.is-matched {
+  background-color: #6fbef3;
+  border: solid 1px #6fbef3;
+}
+
 .c-card-inner {
   position: relative;
   width: 100%;
