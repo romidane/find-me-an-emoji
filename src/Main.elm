@@ -74,34 +74,23 @@ type alias Model =
     }
 
 
-
--- type Model
---     = Home Home.Model
---     | Game Game.Model
-
-
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flag url key =
+    let
+        ( gameModel, gameMsg ) =
+            Game.init ()
+
+        ( homeModel, homeMsg ) =
+            Home.init ()
+    in
     ( { key = key
       , url = routeFromUrl url
-      , home =
-            { title = "Likedy split"
-            }
-      , game =
-            { board = []
-            , currentLevel = Game.Level 1 0 0
-            , time = Time.millisToPosix 0
-            , zone = Time.utc
-            , config =
-                { gameTime = 15
-                , sneakPeakTime = 3
-                , numberOfCards = 16
-                }
-            }
+      , home = homeModel
+      , game = gameModel
       }
     , Cmd.batch
-        [ Task.succeed (GameMsg Game.NewGame) |> Task.perform identity
-        , Cmd.map GameMsg (Task.perform Game.AdjustTimeZone Time.here)
+        [ Cmd.map GameMsg gameMsg
+        , Cmd.map HomeMsg homeMsg
         ]
     )
 
@@ -146,11 +135,6 @@ update msg model =
             )
 
 
-
--- changeRouteTo -> Route -> M
--- SUBSCRIPTIONS
-
-
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
@@ -182,7 +166,6 @@ viewNavigation model =
             , ul [ class "pure-menu-list" ]
                 [ viewLink "/" "Home" (model.url == Home)
                 , viewLink "/game" "Game" (model.url == Game)
-                , viewLink "/something" "Something" False
                 ]
             ]
         ]
