@@ -1,6 +1,5 @@
-module Page.Game exposing (Level(..), Model, Msg(..), init, subscriptions, update, view)
+module Page.Game exposing (Model, Msg(..), init, subscriptions, update, view)
 
-import Array exposing (Array, fromList, get, length)
 import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -22,30 +21,12 @@ type alias Time =
     Int
 
 
-type Level
-    = Level Int Time Time
-
-
 type alias CurrentTargets =
     ( Emoticon, Emoticon )
 
 
-type alias LevelConfig =
-    { gameTime : Int
-    , sneakPeakTime : Int
-    , numberOfCards : Int
-    }
-
-
-type alias Model =
-    { board : List (Card CardConfig)
-    , time : Time.Posix
-    , zone : Time.Zone
-    , config : LevelConfig
-    , currentLevel : Level
-    , currentTargets : CurrentTargets
-    , gameStarted : Bool
-    }
+type alias GameBoard =
+    List (Card CardConfig)
 
 
 type alias CardId =
@@ -59,27 +40,33 @@ type alias CardConfig =
     }
 
 
+type alias LevelConfig =
+    { gameTime : Int
+    , sneakPeakTime : Int
+    , numberOfCards : Int
+    , currentLevel : Level
+    }
+
+
+type Level
+    = Level Int Time Time
+
+
+type alias Model =
+    { board : GameBoard
+    , time : Time.Posix
+    , zone : Time.Zone
+    , config : LevelConfig
+    , currentTargets : CurrentTargets
+    , gameStarted : Bool
+    }
+
+
 type Card config
     = RelievedCard config
     | SelectedCard config
     | HiddenCard config
     | MatchedCard config
-
-
-getCardConfig : Card CardConfig -> CardConfig
-getCardConfig card =
-    case card of
-        RelievedCard config ->
-            config
-
-        SelectedCard config ->
-            config
-
-        HiddenCard config ->
-            config
-
-        MatchedCard config ->
-            config
 
 
 type Emoticon
@@ -99,17 +86,21 @@ type Emoticon
     | NoFace
 
 
+defaultGameConfig : LevelConfig
+defaultGameConfig =
+    { currentLevel = Level 1 0 0
+    , gameTime = 45
+    , sneakPeakTime = 4
+    , numberOfCards = 20
+    }
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { board = []
       , time = Time.millisToPosix 0
       , zone = Time.utc
-      , config =
-            { gameTime = 45
-            , sneakPeakTime = 4
-            , numberOfCards = 20
-            }
-      , currentLevel = Level 1 0 0
+      , config = defaultGameConfig
       , currentTargets = ( NoFace, NoFace )
       , gameStarted = False
       }
@@ -140,14 +131,14 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         NewGame ->
-            ( { model | currentLevel = Level 1 0 0 }
+            ( { model | config = defaultGameConfig }
             , Cmd.batch
                 [ Random.generate PairOfCards (Random.pair cardGenerator cardGenerator)
                 ]
             )
 
         NextLevel ->
-            ( { model | currentLevel = updateLevel model.currentLevel }
+            ( { model | config = updateLevel model.config }
             , Cmd.batch
                 [ Random.generate PairOfCards (Random.pair cardGenerator cardGenerator)
                 ]
@@ -162,22 +153,24 @@ update msg model =
             )
 
         NewCards list ->
-            ( { model | board = generateCardList list }
+            ( { model | board = generateCardList model.config list }
             , Cmd.none
             )
 
         Tick newTime ->
-            ( if model.gameStarted then
-                { model
+            if model.gameStarted then
+                ( { model
                     | time = newTime
-                    , currentLevel = updateLevelTime model.config model.currentLevel
+                    , config = updateLevelTime model.config
                     , board = updateCardsTime model.config model.currentTargets model.board
-                }
+                  }
+                , Cmd.none
+                )
 
-              else
-                model
-            , Cmd.none
-            )
+            else
+                ( model
+                , Cmd.none
+                )
 
         AdjustTimeZone newZone ->
             ( { model | zone = newZone }
@@ -197,26 +190,10 @@ update msg model =
                     model.currentTargets
 
                 target1InBoard =
-                    model.board
-                        |> List.filter
-                            (\card ->
-                                let
-                                    config =
-                                        getCardConfig card
-                                in
-                                config.emoticon == target1
-                            )
+                    listOfEmoticonsOf target1 model.board
 
                 target2InBoard =
-                    model.board
-                        |> List.filter
-                            (\card ->
-                                let
-                                    config =
-                                        getCardConfig card
-                                in
-                                config.emoticon == target2
-                            )
+                    listOfEmoticonsOf target2 model.board
 
                 allTargetsComplete =
                     List.append target2InBoard target1InBoard
@@ -237,14 +214,37 @@ update msg model =
                 ( model, Cmd.none )
 
 
-updateLevel : Level -> Level
-updateLevel (Level num _ _) =
-    Level (num + 1) 0 0
-
-
-updateLevelTime : LevelConfig -> Level -> Level
-updateLevelTime config (Level num gameTime sneakPeakTime) =
+updateLevel : LevelConfig -> LevelConfig
+updateLevel config =
     let
+        (Level level _ _) =
+            config.currentLevel
+
+        nextLevel =
+            level + 1
+    in
+    if modBy nextLevel 5 == 0 then
+        { config | currentLevel = Level nextLevel 0 0, gameTime = config.gameTime - 5, numberOfCards = config.numberOfCards + 5 }
+
+    else
+        { config | currentLevel = Level nextLevel 0 0 }
+
+
+updateGameConfig : LevelConfig -> LevelConfig
+updateGameConfig config =
+    if config.gameTime > 25 && config.numberOfCards < 30 then
+        { config | gameTime = config.gameTime - 3, numberOfCards = config.numberOfCards + 5 }
+
+    else
+        config
+
+
+updateLevelTime : LevelConfig -> LevelConfig
+updateLevelTime config =
+    let
+        (Level num gameTime sneakPeakTime) =
+            config.currentLevel
+
         timeElapsed =
             if gameTime < config.gameTime && sneakPeakTime >= config.sneakPeakTime then
                 gameTime + 1
@@ -259,10 +259,10 @@ updateLevelTime config (Level num gameTime sneakPeakTime) =
             else
                 sneakPeakTime
     in
-    Level num timeElapsed sneakPeakElapsed
+    { config | currentLevel = Level num timeElapsed sneakPeakElapsed }
 
 
-updateCardsTime : LevelConfig -> CurrentTargets -> List (Card CardConfig) -> List (Card CardConfig)
+updateCardsTime : LevelConfig -> CurrentTargets -> GameBoard -> GameBoard
 updateCardsTime config targets =
     List.map
         (\card ->
@@ -299,7 +299,7 @@ updateCardsTime config targets =
         )
 
 
-updateCardSelection : CardId -> CurrentTargets -> List (Card CardConfig) -> List (Card CardConfig)
+updateCardSelection : CardId -> CurrentTargets -> GameBoard -> GameBoard
 updateCardSelection id targets =
     List.map
         (\card ->
@@ -328,9 +328,38 @@ cardIsATarget ( target1, target2 ) card =
     List.member config.emoticon [ target1, target2 ]
 
 
-generateCardList : List Emoticon -> List (Card CardConfig)
-generateCardList list =
-    List.indexedMap (\index emoticon -> RelievedCard { id = index, emoticon = emoticon, revealTime = 2 }) list
+generateCardList : LevelConfig -> List Emoticon -> GameBoard
+generateCardList config list =
+    List.indexedMap (\index emoticon -> RelievedCard { id = index, emoticon = emoticon, revealTime = config.sneakPeakTime }) list
+
+
+listOfEmoticonsOf : Emoticon -> GameBoard -> GameBoard
+listOfEmoticonsOf target board =
+    board
+        |> List.filter
+            (\card ->
+                let
+                    config =
+                        getCardConfig card
+                in
+                config.emoticon == target
+            )
+
+
+getCardConfig : Card CardConfig -> CardConfig
+getCardConfig card =
+    case card of
+        RelievedCard config ->
+            config
+
+        SelectedCard config ->
+            config
+
+        HiddenCard config ->
+            config
+
+        MatchedCard config ->
+            config
 
 
 listOfEmoticons : List Emoticon
@@ -367,7 +396,7 @@ weightedCardGenerator ( emoticon1, emoticon2 ) =
                             ( 40, emoticon )
 
                         else
-                            ( 10, emoticon )
+                            ( 20, emoticon )
                     )
     in
     Random.weighted ( 40, emoticon1 ) list
@@ -418,7 +447,7 @@ viewGameOver : Model -> Html Msg
 viewGameOver model =
     let
         (Level _ timeElapsed _) =
-            model.currentLevel
+            model.config.currentLevel
 
         timesUp =
             timeElapsed == model.config.gameTime
@@ -522,7 +551,7 @@ viewSidebar : Model -> Html Msg
 viewSidebar model =
     let
         (Level level _ _) =
-            model.currentLevel
+            model.config.currentLevel
     in
     aside [ class "c-sidebar" ]
         [ div [ class "pure-g u-mb-bravo" ]
@@ -550,7 +579,7 @@ viewTimer : Model -> Html msg
 viewTimer model =
     let
         (Level _ timeElapsed _) =
-            model.currentLevel
+            model.config.currentLevel
 
         countDown =
             (toFloat timeElapsed / toFloat model.config.gameTime) * 100
@@ -568,16 +597,37 @@ viewEmojiTargets model =
         , div [ class "pure-u-1-2" ]
             [ span [ class "c-icon__emoticon" ]
                 [ text (viewEmoticon (Tuple.first model.currentTargets)) ]
+            , span [ class "c-icon__badge" ]
+                [ text (String.fromInt <| countNumOfTargets (Tuple.first model.currentTargets) model.board) ]
             ]
         , div [ class "pure-u-1-2" ]
             [ span [ class "c-icon__emoticon" ]
                 [ text (viewEmoticon (Tuple.second model.currentTargets)) ]
+            , span [ class "c-icon__badge" ]
+                [ text (String.fromInt <| countNumOfTargets (Tuple.second model.currentTargets) model.board) ]
             ]
         ]
 
 
 
 -- Utilities
+
+
+countNumOfTargets : Emoticon -> GameBoard -> Int
+countNumOfTargets target =
+    List.foldl
+        (\card acc ->
+            let
+                config =
+                    getCardConfig card
+            in
+            if config.emoticon == target then
+                acc + 1
+
+            else
+                acc
+        )
+        0
 
 
 cssClassNames : List ( String, Bool ) -> String
