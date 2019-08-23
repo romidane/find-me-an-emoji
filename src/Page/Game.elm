@@ -18,10 +18,6 @@ import Time
 -- MODEL
 
 
-type alias Time =
-    Int
-
-
 type alias CurrentTargets =
     ( Emoticon, Emoticon )
 
@@ -34,10 +30,22 @@ type alias CardId =
     Int
 
 
+type alias CssClassList =
+    List ( String, Bool )
+
+
 type alias CardConfig =
     { id : CardId
     , emoticon : Emoticon
     , revealTime : Int
+    }
+
+
+type alias Level =
+    { level : Int
+    , timeElapsed : Int
+    , sneakPeakTimeElapsed : Int
+    , incorrectSelections : Int
     }
 
 
@@ -50,18 +58,20 @@ type alias LevelConfig =
     }
 
 
-type Level
-    = Level Int Time Time
-
-
 type alias Model =
     { board : GameBoard
     , time : Time.Posix
     , zone : Time.Zone
     , config : LevelConfig
     , currentTargets : CurrentTargets
-    , gameStarted : Bool
+    , gameStatus : GameStatus
     }
+
+
+type GameStatus
+    = GameStarted
+    | GameIdle
+    | GameOver
 
 
 type Card config
@@ -69,6 +79,7 @@ type Card config
     | SelectedCard config
     | HiddenCard config
     | MatchedCard config
+    | ShakingCard config
 
 
 type Emoticon
@@ -90,7 +101,12 @@ type Emoticon
 
 defaultGameConfig : LevelConfig
 defaultGameConfig =
-    { currentLevel = Level 1 0 0
+    { currentLevel =
+        { level = 1
+        , timeElapsed = 0
+        , sneakPeakTimeElapsed = 0
+        , incorrectSelections = 0
+        }
     , gameTime = 45
     , sneakPeakTime = 4
     , numberOfCards = 20
@@ -105,7 +121,7 @@ init _ =
       , zone = Time.utc
       , config = defaultGameConfig
       , currentTargets = ( NoFace, NoFace )
-      , gameStarted = False
+      , gameStatus = GameIdle
       }
     , Cmd.batch
         [ Task.succeed NewGame |> Task.perform identity
@@ -126,6 +142,7 @@ type Msg
     | Tick Time.Posix
     | AdjustTimeZone Time.Zone
     | UpdateLevelCompletion
+    | UpdateGameStatus
     | StartGame
     | NextLevel
 
@@ -134,21 +151,21 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         NewGame ->
-            ( { model | config = defaultGameConfig, gameStarted = False }
+            ( { model | config = defaultGameConfig, gameStatus = GameIdle }
             , Cmd.batch
                 [ generateRandomPair
                 ]
             )
 
         NextLevel ->
-            ( { model | config = updateLevel model.config, gameStarted = False }
+            ( { model | config = updateLevel model.config, gameStatus = GameIdle }
             , Cmd.batch
                 [ generateRandomPair
                 ]
             )
 
         StartGame ->
-            ( { model | gameStarted = True }, Cmd.none )
+            ( { model | gameStatus = GameStarted }, Cmd.none )
 
         SelectCard id ->
             ( { model | board = updateCardSelection id model.currentTargets model.board }
@@ -161,19 +178,20 @@ update msg model =
             )
 
         Tick newTime ->
-            if model.gameStarted then
-                ( { model
-                    | time = newTime
-                    , config = updateLevelTime model.config
-                    , board = updateCardsTime model.config model.currentTargets model.board
-                  }
-                , Cmd.none
-                )
+            case model.gameStatus of
+                GameStarted ->
+                    ( { model
+                        | time = newTime
+                        , config = updateLevelTime model.config
+                        , board = updateCardsTime model.config model.currentTargets model.board
+                      }
+                    , Task.succeed UpdateGameStatus |> Task.perform identity
+                    )
 
-            else
-                ( model
-                , Cmd.none
-                )
+                _ ->
+                    ( model
+                    , Cmd.none
+                    )
 
         AdjustTimeZone newZone ->
             ( { model | zone = newZone }
@@ -186,19 +204,24 @@ update msg model =
         UpdateLevelCompletion ->
             updateLevelCompletion model
 
+        UpdateGameStatus ->
+            ( { model | gameStatus = updateGameStatus model }
+            , Cmd.none
+            )
+
 
 updateLevel : LevelConfig -> LevelConfig
 updateLevel config =
     let
-        (Level level _ _) =
+        currLevel =
             config.currentLevel
 
         nextLevel =
-            level + 1
+            currLevel.level + 1
     in
     if modBy nextLevel 5 == 0 then
         { config
-            | currentLevel = Level nextLevel 0 0
+            | currentLevel = { currLevel | level = nextLevel }
             , gameTime = config.gameTime - 5
             , numberOfCards = config.numberOfCards + 5
             , numberOfTargets =
@@ -210,7 +233,20 @@ updateLevel config =
         }
 
     else
-        { config | currentLevel = Level nextLevel 0 0 }
+        { config | currentLevel = Level nextLevel 0 0 0 }
+
+
+updateGameStatus : Model -> GameStatus
+updateGameStatus model =
+    let
+        levelConfig =
+            model.config.currentLevel
+    in
+    if levelConfig.timeElapsed >= model.config.gameTime then
+        GameOver
+
+    else
+        model.gameStatus
 
 
 updateLevelCompletion : Model -> ( Model, Cmd Msg )
@@ -254,24 +290,24 @@ updateGameConfig config =
 updateLevelTime : LevelConfig -> LevelConfig
 updateLevelTime config =
     let
-        (Level num gameTime sneakPeakTime) =
+        { level, timeElapsed, sneakPeakTimeElapsed } =
             config.currentLevel
 
-        timeElapsed =
-            if gameTime < config.gameTime && sneakPeakTime >= config.sneakPeakTime then
-                gameTime + 1
+        time =
+            if timeElapsed < config.gameTime && sneakPeakTimeElapsed >= config.sneakPeakTime then
+                timeElapsed + 1
 
             else
-                gameTime
+                timeElapsed
 
-        sneakPeakElapsed =
-            if sneakPeakTime < config.sneakPeakTime then
-                sneakPeakTime + 1
+        sneakPeakTime =
+            if sneakPeakTimeElapsed < config.sneakPeakTime then
+                sneakPeakTimeElapsed + 1
 
             else
-                sneakPeakTime
+                sneakPeakTimeElapsed
     in
-    { config | currentLevel = Level num timeElapsed sneakPeakElapsed }
+    { config | currentLevel = Level level time sneakPeakTime 0 }
 
 
 updateCardsTime : LevelConfig -> CurrentTargets -> GameBoard -> GameBoard
@@ -349,8 +385,15 @@ cardIsATarget ( target1, target2 ) card =
 
 
 generateCardList : LevelConfig -> List Emoticon -> GameBoard
-generateCardList config list =
-    List.indexedMap (\index emoticon -> RevealedCard { id = index, emoticon = emoticon, revealTime = 0 }) list
+generateCardList config =
+    List.indexedMap
+        (\index emoticon ->
+            RevealedCard
+                { id = index
+                , emoticon = emoticon
+                , revealTime = 0
+                }
+        )
 
 
 listOfEmoticonsOf : Emoticon -> GameBoard -> GameBoard
@@ -368,7 +411,7 @@ listOfEmoticonsOf target board =
 
 generateRandomPair : Cmd Msg
 generateRandomPair =
-    Random.generate PairOfCards (Random.pair cardGenerator cardGenerator)
+    Random.generate PairOfCards <| Random.pair cardGenerator cardGenerator
 
 
 getCardConfig : Card CardConfig -> CardConfig
@@ -384,6 +427,9 @@ getCardConfig card =
             config
 
         MatchedCard config ->
+            config
+
+        ShakingCard config ->
             config
 
 
@@ -467,8 +513,15 @@ view model =
             [ div [ class "pure-u-2-3" ]
                 [ div [ class "c-game-container" ]
                     [ viewStart model
-                    , div [ class "pure-g" ] (List.map (\card -> section [ class "pure-u-1-5" ] [ viewCard card ]) model.board)
-                    , viewGameOver model
+                    , div [ class "pure-g" ]
+                        (model.board
+                            |> List.map
+                                (\card ->
+                                    section [ class "pure-u-1-5" ]
+                                        [ viewCard card ]
+                                )
+                        )
+                    , viewGameOver model.gameStatus
                     ]
                 ]
             , div [ class "pure-u-1-3" ]
@@ -480,37 +533,40 @@ view model =
 viewStart : Model -> Html Msg
 viewStart model =
     let
-        (Level level _ _) =
+        { level } =
             model.config.currentLevel
     in
-    div [ class (cssClassNames [ ( "c-game-start", True ), ( "u-hidden", model.gameStarted ) ]) ]
-        [ div [ class "c-game-start__content" ]
-            [ h2 [ class "c-heading-bravo u-no-margin" ] [ text <| "Level: " ++ String.fromInt level ]
-            , div [ class "c-game-start__instructions" ] [ viewEmojiTargets model ]
-            , button [ class "pure-button pure-button-primary c-btn--pink", onClick StartGame ] [ text "Let's go!" ]
-            ]
-        ]
+    case model.gameStatus of
+        GameIdle ->
+            div [ class (cssClassNames [ ( "c-game-start", True ) ]) ]
+                [ div [ class "c-game-start__content" ]
+                    [ h2 [ class "c-heading-bravo u-no-margin" ] [ text <| "Level: " ++ String.fromInt level ]
+                    , div [ class "c-game-start__instructions" ] [ viewEmojiTargets model ]
+                    , button [ class "pure-button pure-button-primary c-btn--pink", onClick StartGame ] [ text "Let's go!" ]
+                    ]
+                ]
+
+        _ ->
+            text ""
 
 
-viewGameOver : Model -> Html Msg
-viewGameOver model =
-    let
-        (Level _ timeElapsed _) =
-            model.config.currentLevel
+viewGameOver : GameStatus -> Html Msg
+viewGameOver status =
+    case status of
+        GameOver ->
+            div
+                [ class (cssClassNames [ ( "c-game-over", True ) ]) ]
+                [ div [ class "c-game-over__content" ]
+                    [ h2 [ class "u-no-margin-top" ]
+                        [ text "Game Over" ]
+                    , button
+                        [ class "pure-button pure-button-primary c-btn--pink", onClick NewGame ]
+                        [ text "Play a new game" ]
+                    ]
+                ]
 
-        timesUp =
-            timeElapsed == model.config.gameTime
-    in
-    div
-        [ class (cssClassNames [ ( "c-game-over", True ), ( "u-hidden", not timesUp ) ]) ]
-        [ div [ class "c-game-over__content" ]
-            [ h2 [ class "u-no-margin-top" ]
-                [ text "Game Over" ]
-            , button
-                [ class "pure-button pure-button-primary c-btn--pink", onClick NewGame ]
-                [ text "Play a new game" ]
-            ]
-        ]
+        _ ->
+            text ""
 
 
 viewEmoticon : Emoticon -> String
@@ -574,8 +630,11 @@ viewCard card =
         MatchedCard config ->
             viewCardItem [ ( "is-matched", True ) ] config
 
+        ShakingCard config ->
+            viewCardItem [ ( "is-fliped", True ), ( "is-shaking", True ) ] config
 
-viewCardItem : List ( String, Bool ) -> CardConfig -> Html Msg
+
+viewCardItem : CssClassList -> CardConfig -> Html Msg
 viewCardItem css config =
     div
         [ class
@@ -599,7 +658,7 @@ viewCardItem css config =
 viewSidebar : Model -> Html Msg
 viewSidebar model =
     let
-        (Level level _ _) =
+        { level } =
             model.config.currentLevel
     in
     aside [ class "c-sidebar" ]
@@ -616,18 +675,20 @@ viewSidebar model =
                 ]
             ]
         , viewTimer model
-        , if model.gameStarted then
-            div [ class "c-sidebar__instruction-container" ] [ viewEmojiTargets model ]
+        , case model.gameStatus of
+            GameStarted ->
+                div [ class "c-sidebar__instruction-container" ]
+                    [ viewEmojiTargets model ]
 
-          else
-            text ""
+            _ ->
+                text ""
         ]
 
 
 viewTimer : Model -> Html msg
 viewTimer model =
     let
-        (Level _ timeElapsed _) =
+        { timeElapsed } =
             model.config.currentLevel
 
         countDown =
@@ -685,7 +746,7 @@ countNumberOfTargets target board =
             0
 
 
-cssClassNames : List ( String, Bool ) -> String
+cssClassNames : CssClassList -> String
 cssClassNames list =
     List.foldl
         (\( key, value ) acc ->
