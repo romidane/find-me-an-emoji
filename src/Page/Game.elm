@@ -133,14 +133,14 @@ update msg model =
         NewGame ->
             ( { model | config = defaultGameConfig }
             , Cmd.batch
-                [ Random.generate PairOfCards (Random.pair cardGenerator cardGenerator)
+                [ generateRandomPair
                 ]
             )
 
         NextLevel ->
             ( { model | config = updateLevel model.config }
             , Cmd.batch
-                [ Random.generate PairOfCards (Random.pair cardGenerator cardGenerator)
+                [ generateRandomPair
                 ]
             )
 
@@ -178,40 +178,10 @@ update msg model =
             )
 
         PairOfCards currentTargets ->
-            ( { model | currentTargets = currentTargets }
-            , Random.generate NewCards <|
-                Random.list model.config.numberOfCards <|
-                    weightedCardGenerator currentTargets
-            )
+            generateNewCards model currentTargets
 
         UpdateLevelCompletion ->
-            let
-                ( target1, target2 ) =
-                    model.currentTargets
-
-                target1InBoard =
-                    listOfEmoticonsOf target1 model.board
-
-                target2InBoard =
-                    listOfEmoticonsOf target2 model.board
-
-                allTargetsComplete =
-                    List.append target2InBoard target1InBoard
-                        |> List.all
-                            (\card ->
-                                case card of
-                                    MatchedCard _ ->
-                                        True
-
-                                    _ ->
-                                        False
-                            )
-            in
-            if allTargetsComplete then
-                ( model, Task.succeed NextLevel |> Task.perform identity )
-
-            else
-                ( model, Cmd.none )
+            updateLevelCompletion model
 
 
 updateLevel : LevelConfig -> LevelConfig
@@ -228,6 +198,37 @@ updateLevel config =
 
     else
         { config | currentLevel = Level nextLevel 0 0 }
+
+
+updateLevelCompletion : Model -> ( Model, Cmd Msg )
+updateLevelCompletion model =
+    let
+        ( target1, target2 ) =
+            model.currentTargets
+
+        target1InBoard =
+            listOfEmoticonsOf target1 model.board
+
+        target2InBoard =
+            listOfEmoticonsOf target2 model.board
+
+        allTargetsComplete =
+            List.append target2InBoard target1InBoard
+                |> List.all
+                    (\card ->
+                        case card of
+                            MatchedCard _ ->
+                                True
+
+                            _ ->
+                                False
+                    )
+    in
+    if allTargetsComplete then
+        ( model, Task.succeed NextLevel |> Task.perform identity )
+
+    else
+        ( model, Cmd.none )
 
 
 updateGameConfig : LevelConfig -> LevelConfig
@@ -271,7 +272,7 @@ updateCardsTime config targets =
                     getCardConfig card
 
                 timeExpired =
-                    conf.revealTime > config.sneakPeakTime
+                    conf.revealTime >= config.sneakPeakTime
 
                 resetRevealTime =
                     { conf | revealTime = 0 }
@@ -330,7 +331,7 @@ cardIsATarget ( target1, target2 ) card =
 
 generateCardList : LevelConfig -> List Emoticon -> GameBoard
 generateCardList config list =
-    List.indexedMap (\index emoticon -> RelievedCard { id = index, emoticon = emoticon, revealTime = config.sneakPeakTime }) list
+    List.indexedMap (\index emoticon -> RelievedCard { id = index, emoticon = emoticon, revealTime = 0 }) list
 
 
 listOfEmoticonsOf : Emoticon -> GameBoard -> GameBoard
@@ -344,6 +345,11 @@ listOfEmoticonsOf target board =
                 in
                 config.emoticon == target
             )
+
+
+generateRandomPair : Cmd Msg
+generateRandomPair =
+    Random.generate PairOfCards (Random.pair cardGenerator cardGenerator)
 
 
 getCardConfig : Card CardConfig -> CardConfig
@@ -360,6 +366,19 @@ getCardConfig card =
 
         MatchedCard config ->
             config
+
+
+generateNewCards : Model -> CurrentTargets -> ( Model, Cmd Msg )
+generateNewCards model ( a, b ) =
+    if a == b then
+        ( model, generateRandomPair )
+
+    else
+        ( { model | currentTargets = ( a, b ) }
+        , Random.generate NewCards <|
+            Random.list model.config.numberOfCards <|
+                weightedCardGenerator ( a, b )
+        )
 
 
 listOfEmoticons : List Emoticon
