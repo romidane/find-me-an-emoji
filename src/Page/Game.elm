@@ -46,7 +46,7 @@ type alias LevelConfig =
     , sneakPeakTime : Int
     , numberOfCards : Int
     , currentLevel : Level
-    , numOfPairs : Int
+    , numberOfTargets : Int
     }
 
 
@@ -94,7 +94,7 @@ defaultGameConfig =
     , gameTime = 45
     , sneakPeakTime = 4
     , numberOfCards = 20
-    , numOfPairs = 3
+    , numberOfTargets = 3
     }
 
 
@@ -134,14 +134,14 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         NewGame ->
-            ( { model | config = defaultGameConfig }
+            ( { model | config = defaultGameConfig, gameStarted = False }
             , Cmd.batch
                 [ generateRandomPair
                 ]
             )
 
         NextLevel ->
-            ( { model | config = updateLevel model.config }
+            ( { model | config = updateLevel model.config, gameStarted = False }
             , Cmd.batch
                 [ generateRandomPair
                 ]
@@ -237,7 +237,16 @@ updateLevelCompletion model =
 updateGameConfig : LevelConfig -> LevelConfig
 updateGameConfig config =
     if config.gameTime > 25 && config.numberOfCards < 30 then
-        { config | gameTime = config.gameTime - 3, numberOfCards = config.numberOfCards + 5 }
+        { config
+            | gameTime = config.gameTime - 3
+            , numberOfCards = config.numberOfCards + 5
+            , numberOfTargets =
+                if config.numberOfTargets > 1 then
+                    config.numberOfTargets - 1
+
+                else
+                    config.numberOfTargets
+        }
 
     else
         config
@@ -379,14 +388,14 @@ generateNewCards model ( emoticon1, emoticon2 ) =
     else
         ( { model | currentTargets = ( emoticon1, emoticon2 ) }
         , Random.generate NewCards
-            (Random.list (model.config.numberOfCards - (model.config.numOfPairs * 2)) (weightedCardGenerator ( emoticon1, emoticon2 ))
+            (Random.list (model.config.numberOfCards - (model.config.numberOfTargets * 2)) (weightedCardGenerator ( emoticon1, emoticon2 ))
                 |> Random.andThen
                     (\weightedList ->
                         let
                             newList =
                                 weightedList
-                                    |> List.append (List.repeat model.config.numOfPairs emoticon1)
-                                    |> List.append (List.repeat model.config.numOfPairs emoticon2)
+                                    |> List.append (List.repeat model.config.numberOfTargets emoticon1)
+                                    |> List.append (List.repeat model.config.numberOfTargets emoticon2)
                         in
                         shuffle newList
                     )
@@ -463,11 +472,15 @@ view model =
 
 viewStart : Model -> Html Msg
 viewStart model =
+    let
+        (Level level _ _) =
+            model.config.currentLevel
+    in
     div [ class (cssClassNames [ ( "c-game-start", True ), ( "u-hidden", model.gameStarted ) ]) ]
         [ div [ class "c-game-start__content" ]
-            [ h2 [ class "c-heading-bravo u-no-margin" ] [ text "Welcome challenger!" ]
+            [ h2 [ class "c-heading-bravo u-no-margin" ] [ text <| "Level: " ++ String.fromInt level ]
             , div [ class "c-game-start__instructions" ] [ viewEmojiTargets model ]
-            , button [ class "pure-button pure-button-primary c-btn--pink", onClick StartGame ] [ text "I'm ready" ]
+            , button [ class "pure-button pure-button-primary c-btn--pink", onClick StartGame ] [ text "Let's go!" ]
             ]
         ]
 
@@ -627,13 +640,13 @@ viewEmojiTargets model =
             [ span [ class "c-icon__emoticon" ]
                 [ text (viewEmoticon (Tuple.first model.currentTargets)) ]
             , span [ class "c-icon__badge" ]
-                [ text (String.fromInt <| countNumOfTargets (Tuple.first model.currentTargets) model.board) ]
+                [ text (String.fromInt <| countNumberOfTargets (Tuple.first model.currentTargets) model.board) ]
             ]
         , div [ class "pure-u-1-2" ]
             [ span [ class "c-icon__emoticon" ]
                 [ text (viewEmoticon (Tuple.second model.currentTargets)) ]
             , span [ class "c-icon__badge" ]
-                [ text (String.fromInt <| countNumOfTargets (Tuple.second model.currentTargets) model.board) ]
+                [ text (String.fromInt <| countNumberOfTargets (Tuple.second model.currentTargets) model.board) ]
             ]
         ]
 
@@ -642,8 +655,8 @@ viewEmojiTargets model =
 -- Utilities
 
 
-countNumOfTargets : Emoticon -> GameBoard -> Int
-countNumOfTargets target =
+countNumberOfTargets : Emoticon -> GameBoard -> Int
+countNumberOfTargets target =
     List.foldl
         (\card acc ->
             let
