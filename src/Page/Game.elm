@@ -6,6 +6,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import List
 import Random
+import Random.List exposing (shuffle)
 import String
 import Svg
 import Svg.Attributes as SvgAttr
@@ -45,6 +46,7 @@ type alias LevelConfig =
     , sneakPeakTime : Int
     , numberOfCards : Int
     , currentLevel : Level
+    , numOfPairs : Int
     }
 
 
@@ -92,6 +94,7 @@ defaultGameConfig =
     , gameTime = 45
     , sneakPeakTime = 4
     , numberOfCards = 20
+    , numOfPairs = 3
     }
 
 
@@ -369,15 +372,25 @@ getCardConfig card =
 
 
 generateNewCards : Model -> CurrentTargets -> ( Model, Cmd Msg )
-generateNewCards model ( a, b ) =
-    if a == b then
+generateNewCards model ( emoticon1, emoticon2 ) =
+    if emoticon1 == emoticon2 then
         ( model, generateRandomPair )
 
     else
-        ( { model | currentTargets = ( a, b ) }
-        , Random.generate NewCards <|
-            Random.list model.config.numberOfCards <|
-                weightedCardGenerator ( a, b )
+        ( { model | currentTargets = ( emoticon1, emoticon2 ) }
+        , Random.generate NewCards
+            (Random.list (model.config.numberOfCards - (model.config.numOfPairs * 2)) (weightedCardGenerator ( emoticon1, emoticon2 ))
+                |> Random.andThen
+                    (\weightedList ->
+                        let
+                            newList =
+                                weightedList
+                                    |> List.append (List.repeat model.config.numOfPairs emoticon1)
+                                    |> List.append (List.repeat model.config.numOfPairs emoticon2)
+                        in
+                        shuffle newList
+                    )
+            )
         )
 
 
@@ -409,16 +422,13 @@ weightedCardGenerator ( emoticon1, emoticon2 ) =
         list =
             listOfEmoticons
                 |> List.filter (\emoticon -> not (emoticon == emoticon1))
+                |> List.filter (\emoticon -> not (emoticon == emoticon2))
                 |> List.map
                     (\emoticon ->
-                        if emoticon == emoticon2 then
-                            ( 40, emoticon )
-
-                        else
-                            ( 20, emoticon )
+                        ( 20, emoticon )
                     )
     in
-    Random.weighted ( 40, emoticon1 ) list
+    Random.weighted ( 0, emoticon1 ) list
 
 
 
