@@ -65,7 +65,7 @@ type alias Model =
 
 
 type Card config
-    = RelievedCard config
+    = RevealedCard config
     | SelectedCard config
     | HiddenCard config
     | MatchedCard config
@@ -197,7 +197,17 @@ updateLevel config =
             level + 1
     in
     if modBy nextLevel 5 == 0 then
-        { config | currentLevel = Level nextLevel 0 0, gameTime = config.gameTime - 5, numberOfCards = config.numberOfCards + 5 }
+        { config
+            | currentLevel = Level nextLevel 0 0
+            , gameTime = config.gameTime - 5
+            , numberOfCards = config.numberOfCards + 5
+            , numberOfTargets =
+                if config.numberOfTargets > 1 then
+                    config.numberOfTargets - 1
+
+                else
+                    config.numberOfTargets
+        }
 
     else
         { config | currentLevel = Level nextLevel 0 0 }
@@ -209,14 +219,9 @@ updateLevelCompletion model =
         ( target1, target2 ) =
             model.currentTargets
 
-        target1InBoard =
-            listOfEmoticonsOf target1 model.board
-
-        target2InBoard =
-            listOfEmoticonsOf target2 model.board
-
         allTargetsComplete =
-            List.append target2InBoard target1InBoard
+            listOfEmoticonsOf target1 model.board
+                |> List.append (listOfEmoticonsOf target2 model.board)
                 |> List.all
                     (\card ->
                         case card of
@@ -240,12 +245,6 @@ updateGameConfig config =
         { config
             | gameTime = config.gameTime - 3
             , numberOfCards = config.numberOfCards + 5
-            , numberOfTargets =
-                if config.numberOfTargets > 1 then
-                    config.numberOfTargets - 1
-
-                else
-                    config.numberOfTargets
         }
 
     else
@@ -293,12 +292,12 @@ updateCardsTime config targets =
                     { conf | revealTime = conf.revealTime + 1 }
             in
             case card of
-                RelievedCard cardConfig ->
+                RevealedCard cardConfig ->
                     if timeExpired then
                         HiddenCard resetRevealTime
 
                     else
-                        RelievedCard updatedRevealTime
+                        RevealedCard updatedRevealTime
 
                 SelectedCard cardConfig ->
                     if timeExpired then
@@ -321,11 +320,19 @@ updateCardSelection id targets =
                     getCardConfig card
             in
             if config.id == id then
-                if cardIsATarget targets card then
-                    MatchedCard { config | revealTime = 0 }
+                case card of
+                    RevealedCard _ ->
+                        card
 
-                else
-                    SelectedCard config
+                    HiddenCard _ ->
+                        if cardIsATarget targets card then
+                            MatchedCard { config | revealTime = 0 }
+
+                        else
+                            SelectedCard config
+
+                    _ ->
+                        card
 
             else
                 card
@@ -343,7 +350,7 @@ cardIsATarget ( target1, target2 ) card =
 
 generateCardList : LevelConfig -> List Emoticon -> GameBoard
 generateCardList config list =
-    List.indexedMap (\index emoticon -> RelievedCard { id = index, emoticon = emoticon, revealTime = 0 }) list
+    List.indexedMap (\index emoticon -> RevealedCard { id = index, emoticon = emoticon, revealTime = 0 }) list
 
 
 listOfEmoticonsOf : Emoticon -> GameBoard -> GameBoard
@@ -367,7 +374,7 @@ generateRandomPair =
 getCardConfig : Card CardConfig -> CardConfig
 getCardConfig card =
     case card of
-        RelievedCard config ->
+        RevealedCard config ->
             config
 
         SelectedCard config ->
@@ -561,7 +568,7 @@ viewCard card =
         HiddenCard config ->
             viewCardItem [ ( "is-fliped", True ) ] config
 
-        RelievedCard config ->
+        RevealedCard config ->
             viewCardItem [] config
 
         MatchedCard config ->
@@ -656,20 +663,26 @@ viewEmojiTargets model =
 
 
 countNumberOfTargets : Emoticon -> GameBoard -> Int
-countNumberOfTargets target =
-    List.foldl
-        (\card acc ->
-            let
-                config =
-                    getCardConfig card
-            in
-            if config.emoticon == target then
-                acc + 1
+countNumberOfTargets target board =
+    board
+        |> List.filter
+            (\card ->
+                let
+                    config =
+                        getCardConfig card
+                in
+                config.emoticon == target
+            )
+        |> List.foldl
+            (\card acc ->
+                case card of
+                    MatchedCard _ ->
+                        acc
 
-            else
-                acc
-        )
-        0
+                    _ ->
+                        acc + 1
+            )
+            0
 
 
 cssClassNames : List ( String, Bool ) -> String
