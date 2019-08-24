@@ -14,7 +14,7 @@ type Emoticon
     | FearfulFace
     | StuckOutTongueClosedEyesFace
     | DizzyFace
-    | SeeNoEvilMonkey
+    | MountFuji
     | LoudlyCryingFace
     | FlushedFace
     | ScreamingInFearFace
@@ -85,8 +85,8 @@ viewEmoticon emoticon =
         DizzyFace ->
             "😵"
 
-        SeeNoEvilMonkey ->
-            "🙈"
+        MountFuji ->
+            "🗻"
 
         LoudlyCryingFace ->
             "😭"

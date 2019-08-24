@@ -634,7 +634,7 @@ viewCardItem css config =
                 ]
             , div [ class "c-card-back" ]
                 [ span []
-                    [ text (Data.viewEmoticon Data.SeeNoEvilMonkey) ]
+                    [ text (Data.viewEmoticon Data.MountFuji) ]
                 ]
             ]
         ]
