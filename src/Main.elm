@@ -160,7 +160,7 @@ view model =
 viewNavigation : Model -> Html msg
 viewNavigation model =
     div [ class "c-page-menu pure-menu pure-menu-horizontal" ]
-        [ div [ class "o-container" ]
+        [ div [ class "o-container u-cf" ]
             [ a [ class "pure-menu-heading", href "/" ]
                 [ text "Find me" ]
             , ul [ class "pure-menu-list" ]

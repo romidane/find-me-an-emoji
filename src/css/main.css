@@ -101,6 +101,7 @@ body {
   color: #feffee;
   font-weight: 400;
   font-size: 120%;
+  float: left;
 }
 
 .c-page-menu .pure-menu-item.pure-menu-selected a {
@@ -115,6 +116,11 @@ body {
   background: none;
   border: none;
   color: #aecfe5;
+}
+
+.pure-menu-list {
+  float: right;
+  padding-top: 3px;
 }
 
 @media (min-width: 48em) {
@@ -167,12 +173,12 @@ body {
 
 .c-card.is-selected {
   background-color: #d4d9dd;
-  border: solid 1px #eaecee;
+  border: solid 1px #bfc4c9;
 }
 
 .c-card.is-matched {
   background-color: #6fbef3;
-  border: solid 1px #6fbef3;
+  border: solid 1px #59b6f4;
 }
 
 .c-card-inner {
@@ -435,6 +441,16 @@ body {
 
 .u-order-2 {
   order: 2;
+}
+
+.u-cf:before,
+.u-cf:after {
+  content: " "; /* 1 */
+  display: table; /* 2 */
+}
+
+.u-cf:after {
+  clear: both;
 }
 
 @media screen and (min-width: 48em) {
