@@ -30,7 +30,7 @@ body {
 }
 
 .o-page {
-  padding: 1em;
+  padding: 1em 0.5em;
   color: #2c3e50;
 }
 
@@ -84,7 +84,7 @@ body {
 
 @media screen and (min-width: 48em) {
   .c-btn--pink {
-    font-size: initial;
+    font-size: 1em;
   }
 }
 
@@ -253,8 +253,6 @@ body {
   background-color: #2d3e50;
   color: bisque;
   overflow: hidden;
-  border-top-left-radius: 10px;
-  border-top-right-radius: 10px;
 }
 
 .c-sidebar__instruction-container {
@@ -287,8 +285,7 @@ body {
 @media screen and (min-width: 48em) {
   .c-sidebar {
     padding: 3em 1.5em 2em;
-    border-top-left-radius: none;
-    border-top-right-radius: none;
+    border-radius: 0;
   }
 
   .c-sidebar__instruction-container .c-text {
