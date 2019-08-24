@@ -47,6 +47,7 @@ type alias Level =
     , timeElapsed : Int
     , sneakPeakTimeElapsed : Int
     , incorrectSelections : Int
+    , shakeTimeElapsed : Int
     }
 
 
@@ -73,6 +74,7 @@ type GameStatus
     = GameStarted
     | GameIdle
     | GameOver
+    | GamePaused
 
 
 type Card config
@@ -90,6 +92,7 @@ defaultGameConfig =
         , timeElapsed = 0
         , sneakPeakTimeElapsed = 0
         , incorrectSelections = 0
+        , shakeTimeElapsed = 0
         }
     , gameTime = 45
     , sneakPeakTime = 4
@@ -130,6 +133,7 @@ type Msg
     | StartGame
     | NextLevel
     | UpdateIncorrectSelections CardId
+    | ShuffleCards GameBoard
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -153,12 +157,17 @@ update msg model =
             ( { model | gameStatus = GameStarted }, Cmd.none )
 
         SelectCard id ->
-            ( { model | board = updateCardSelection id model.config.currentTargets model.board }
-            , Cmd.batch
-                [ Task.succeed (UpdateIncorrectSelections id) |> Task.perform identity
-                , Task.succeed UpdateLevelCompletion |> Task.perform identity
-                ]
-            )
+            case model.gameStatus of
+                GameStarted ->
+                    ( { model | board = updateCardSelection id model.config.currentTargets model.board }
+                    , Cmd.batch
+                        [ Task.succeed (UpdateIncorrectSelections id) |> Task.perform identity
+                        , Task.succeed UpdateLevelCompletion |> Task.perform identity
+                        ]
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
 
         NewCards list ->
             ( { model | board = generateCardList model.config list }
@@ -173,7 +182,43 @@ update msg model =
                         , config = updateLevelTime model.config
                         , board = updateCardsTime model.config model.config.currentTargets model.board
                       }
-                    , Task.succeed UpdateGameStatus |> Task.perform identity
+                    , Cmd.batch
+                        [ Task.succeed UpdateGameStatus |> Task.perform identity
+                        ]
+                    )
+
+                GamePaused ->
+                    let
+                        config =
+                            model.config
+
+                        currentLevel =
+                            config.currentLevel
+
+                        updatedLevel =
+                            { currentLevel
+                                | shakeTimeElapsed =
+                                    if currentLevel.incorrectSelections == 3 && currentLevel.shakeTimeElapsed < 2 then
+                                        currentLevel.shakeTimeElapsed + 1
+
+                                    else
+                                        currentLevel.shakeTimeElapsed
+                            }
+
+                        updatedConfig =
+                            { config | currentLevel = updatedLevel }
+                    in
+                    ( { model
+                        | time = newTime
+                        , config = updatedConfig
+                      }
+                    , Cmd.batch
+                        [ if updatedLevel.shakeTimeElapsed >= 2 then
+                            Random.generate ShuffleCards (shuffle model.board)
+
+                          else
+                            Cmd.none
+                        ]
                     )
 
                 _ ->
@@ -197,6 +242,41 @@ update msg model =
             , Cmd.none
             )
 
+        ShuffleCards list ->
+            let
+                config =
+                    model.config
+
+                currentLevel =
+                    config.currentLevel
+
+                updatedLevel =
+                    { currentLevel
+                        | shakeTimeElapsed = 0
+                        , incorrectSelections = 0
+                    }
+
+                updatedConfig =
+                    { config | currentLevel = updatedLevel }
+            in
+            ( { model
+                | gameStatus = GameStarted
+                , board =
+                    list
+                        |> List.map
+                            (\card ->
+                                case card of
+                                    ShakingCard c ->
+                                        HiddenCard { c | revealTime = 0 }
+
+                                    _ ->
+                                        card
+                            )
+                , config = updatedConfig
+              }
+            , Cmd.none
+            )
+
         UpdateIncorrectSelections id ->
             let
                 config =
@@ -205,7 +285,17 @@ update msg model =
                 updatedLevel =
                     { config | currentLevel = updateIncorrectSelections id model }
             in
-            ( { model | config = updatedLevel }, Cmd.none )
+            if updatedLevel.currentLevel.incorrectSelections == 3 then
+                ( { model
+                    | config = updatedLevel
+                    , gameStatus = GamePaused
+                    , board = updateBoardToShake model.board
+                  }
+                , Cmd.none
+                )
+
+            else
+                ( { model | config = updatedLevel }, Cmd.none )
 
 
 updateLevel : LevelConfig -> LevelConfig
@@ -231,7 +321,37 @@ updateLevel config =
         }
 
     else
-        { config | currentLevel = Level nextLevel 0 0 0 }
+        let
+            level =
+                config.currentLevel
+
+            updatedLevel =
+                { level
+                    | level = nextLevel
+                    , sneakPeakTimeElapsed = 0
+                    , incorrectSelections = 0
+                    , shakeTimeElapsed = 0
+                    , timeElapsed = 0
+                }
+        in
+        { config | currentLevel = updatedLevel }
+
+
+updateBoardToShake : GameBoard -> GameBoard
+updateBoardToShake =
+    List.map
+        (\card ->
+            let
+                conf =
+                    getCardConfig card
+            in
+            case card of
+                MatchedCard _ ->
+                    card
+
+                _ ->
+                    ShakingCard conf
+        )
 
 
 updateGameStatus : Model -> GameStatus
@@ -288,7 +408,7 @@ updateGameConfig config =
 updateLevelTime : LevelConfig -> LevelConfig
 updateLevelTime config =
     let
-        { level, timeElapsed, sneakPeakTimeElapsed } =
+        { level, timeElapsed, sneakPeakTimeElapsed, shakeTimeElapsed, incorrectSelections } =
             config.currentLevel
 
         currLevel =
@@ -309,7 +429,11 @@ updateLevelTime config =
                 sneakPeakTimeElapsed
 
         updatedLevel =
-            { currLevel | level = level, timeElapsed = time, sneakPeakTimeElapsed = sneakPeakTime }
+            { currLevel
+                | level = level
+                , timeElapsed = time
+                , sneakPeakTimeElapsed = sneakPeakTime
+            }
     in
     { config | currentLevel = updatedLevel }
 
@@ -396,6 +520,9 @@ updateIncorrectSelections cardId model =
                         if config.id == cardId then
                             case card of
                                 MatchedCard _ ->
+                                    True
+
+                                RevealedCard _ ->
                                     True
 
                                 _ ->
@@ -628,11 +755,11 @@ viewCardItem css config =
         ]
         [ div [ class "c-card-inner" ]
             [ div [ class "c-card-front" ]
-                [ span []
+                [ span [ class "c-emoticon" ]
                     [ text (Data.viewEmoticon config.emoticon) ]
                 ]
             , div [ class "c-card-back" ]
-                [ span []
+                [ span [ class "c-emoticon" ]
                     [ text (Data.viewEmoticon Data.MountFuji) ]
                 ]
             ]
@@ -659,10 +786,17 @@ viewSidebar model =
                 ]
             ]
         , viewTimer model
-        , case model.gameStatus of
-            GameStarted ->
+        , let
+            emojis =
                 div [ class "c-sidebar__instruction-container" ]
                     [ viewEmojiTargets model ]
+          in
+          case model.gameStatus of
+            GameStarted ->
+                emojis
+
+            GamePaused ->
+                emojis
 
             _ ->
                 text ""
