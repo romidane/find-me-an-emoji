@@ -19,6 +19,10 @@ type Emoticon
     | FlushedFace
     | ScreamingInFearFace
     | SmilingWithHaloFace
+    | ExplodingHeadFace
+    | StarStruckFace
+    | PartyFace
+    | CowboyHatFace
     | NoFace
 
 
@@ -40,6 +44,10 @@ listOfEmoticons =
     , FlushedFace
     , ScreamingInFearFace
     , SmilingWithHaloFace
+    , ExplodingHeadFace
+    , StarStruckFace
+    , PartyFace
+    , CowboyHatFace
     ]
 
 
@@ -50,7 +58,7 @@ viewEmoticon emoticon =
             ""
 
         GrinningFace ->
-            "😁"
+            "😀"
 
         TearsOfJoyFace ->
             "😂"
@@ -99,3 +107,15 @@ viewEmoticon emoticon =
 
         SmilingWithHaloFace ->
             "😇"
+
+        ExplodingHeadFace ->
+            "\u{1F92F}"
+
+        StarStruckFace ->
+            "\u{1F929}"
+
+        PartyFace ->
+            "\u{1F973}"
+
+        CowboyHatFace ->
+            "\u{1F920}"

@@ -499,7 +499,6 @@ generateNewCards model ( emoticon1, emoticon2 ) =
                         in
                         shuffle newList
                     )
-                |> Random.andThen shuffle
             )
         )
 
@@ -518,7 +517,7 @@ weightedCardGenerator ( emoticon1, emoticon2 ) =
                 |> List.filter (\emoticon -> not (emoticon == emoticon2))
                 |> List.map
                     (\emoticon ->
-                        ( 10, emoticon )
+                        ( 5, emoticon )
                     )
     in
     Random.weighted ( 0, emoticon1 ) list

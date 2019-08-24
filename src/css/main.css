@@ -150,11 +150,11 @@ body {
 
 /* ---------- Card Component --------- */
 .c-card {
-  height: 74px;
+  height: 77px;
   font-size: 2em;
   text-align: center;
   vertical-align: middle;
-  line-height: 74px;
+  line-height: 77px;
   border: solid 1px #d4d9dd;
   background-color: #eaecee;
   cursor: pointer;
@@ -259,6 +259,7 @@ body {
   background-color: #2d3e50;
   color: bisque;
   overflow: hidden;
+  user-select: none;
 }
 
 .c-sidebar__instruction-container {
@@ -360,7 +361,6 @@ body {
   font-weight: bold;
   text-align: center;
   font-size: 1em;
-  border-right: solid 4px #2d3944;
   z-index: 1;
 }
 
@@ -368,6 +368,7 @@ body {
   .c-game-over,
   .c-game-start {
     font-size: 1.5em;
+    border-right: solid 4px #2d3944;
   }
 }
 
