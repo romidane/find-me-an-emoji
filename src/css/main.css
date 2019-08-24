@@ -190,7 +190,7 @@ body {
   transform-style: preserve-3d;
 }
 
-.c-card.is-fliped .c-card-inner {
+.c-card.is-flipped .c-card-inner {
   transform: rotateY(180deg);
 }
 
@@ -312,7 +312,7 @@ body {
   }
 }
 
-/* ---------- Timer metter --------- */
+/* ---------- Timer meter --------- */
 
 .c-timer-meter {
   height: 20px;

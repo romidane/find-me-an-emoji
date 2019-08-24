@@ -2,15 +2,14 @@ module Page.Game exposing (Model, Msg(..), init, subscriptions, update, view)
 
 import Browser
 import Data.Game as Data
-import Html exposing (..)
+import Html exposing (Html, aside, button, div, h2, p, section, span, text)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
+import Html.Lazy exposing (lazy)
 import List
 import Random
 import Random.List exposing (shuffle)
 import String
-import Svg
-import Svg.Attributes as SvgAttr
 import Task
 import Time
 
@@ -31,10 +30,6 @@ type alias CardId =
     Int
 
 
-type alias CssClassList =
-    List ( String, Bool )
-
-
 type alias CardConfig =
     { id : CardId
     , emoticon : Data.Emoticon
@@ -53,7 +48,7 @@ type alias Level =
 
 type alias LevelConfig =
     { gameTime : Int
-    , errorTreshold : Int
+    , errorThreshold : Int
     , sneakPeakTime : Int
     , numberOfCards : Int
     , currentLevel : Level
@@ -75,7 +70,7 @@ type GameStatus
     = GameStarted
     | GameIdle
     | GameOver
-    | GamePaused
+    | GameCutScene
 
 
 type Card config
@@ -95,7 +90,7 @@ defaultGameConfig =
         , incorrectSelections = 0
         , shakeTimeElapsed = 0
         }
-    , errorTreshold = 5
+    , errorThreshold = 5
     , gameTime = 45
     , sneakPeakTime = 4
     , numberOfCards = 25
@@ -176,6 +171,15 @@ update msg model =
             , Cmd.none
             )
 
+        ShuffleCards list ->
+            ( { model
+                | gameStatus = GameStarted
+                , board = resetBoardFromShake list
+                , config = resetConfigFromShuffle model.config
+              }
+            , Cmd.none
+            )
+
         Tick newTime ->
             case model.gameStatus of
                 GameStarted ->
@@ -184,43 +188,23 @@ update msg model =
                         , config = updateLevelTime model.config
                         , board = updateCardsTime model.config model.config.currentTargets model.board
                       }
-                    , Cmd.batch
-                        [ Task.succeed UpdateGameStatus |> Task.perform identity
-                        ]
+                    , Task.succeed UpdateGameStatus |> Task.perform identity
                     )
 
-                GamePaused ->
+                GameCutScene ->
                     let
-                        config =
-                            model.config
-
-                        currentLevel =
-                            config.currentLevel
-
-                        updatedLevel =
-                            { currentLevel
-                                | shakeTimeElapsed =
-                                    if currentLevel.incorrectSelections == model.config.errorTreshold && currentLevel.shakeTimeElapsed < 2 then
-                                        currentLevel.shakeTimeElapsed + 1
-
-                                    else
-                                        currentLevel.shakeTimeElapsed
-                            }
-
                         updatedConfig =
-                            { config | currentLevel = updatedLevel }
+                            updateLevelShakeConfig model.config
                     in
                     ( { model
                         | time = newTime
                         , config = updatedConfig
                       }
-                    , Cmd.batch
-                        [ if updatedLevel.shakeTimeElapsed >= 2 then
-                            Random.generate ShuffleCards (shuffle model.board)
+                    , if updatedConfig.currentLevel.shakeTimeElapsed >= 2 then
+                        Random.generate ShuffleCards (shuffle model.board)
 
-                          else
-                            Cmd.none
-                        ]
+                      else
+                        Cmd.none
                     )
 
                 _ ->
@@ -244,43 +228,18 @@ update msg model =
             , Cmd.none
             )
 
-        ShuffleCards list ->
-            let
-                config =
-                    model.config
-
-                currentLevel =
-                    config.currentLevel
-
-                updatedLevel =
-                    { currentLevel
-                        | shakeTimeElapsed = 0
-                        , incorrectSelections = 0
-                    }
-
-                updatedConfig =
-                    { config | currentLevel = updatedLevel }
-            in
-            ( { model
-                | gameStatus = GameStarted
-                , board = resetBoardFromShuffle list
-                , config = updatedConfig
-              }
-            , Cmd.none
-            )
-
         UpdateIncorrectSelections id ->
             let
                 config =
                     model.config
 
                 updatedLevel =
-                    { config | currentLevel = updateIncorrectSelections id model }
+                    { config | currentLevel = updateIncorrectSelectionCount id model }
             in
-            if updatedLevel.currentLevel.incorrectSelections == model.config.errorTreshold then
+            if updatedLevel.currentLevel.incorrectSelections == model.config.errorThreshold then
                 ( { model
                     | config = updatedLevel
-                    , gameStatus = GamePaused
+                    , gameStatus = GameCutScene
                     , board = updateBoardToShake model.board
                   }
                 , Cmd.none
@@ -346,17 +305,29 @@ updateBoardToShake =
         )
 
 
-resetBoardFromShuffle : GameBoard -> GameBoard
-resetBoardFromShuffle =
-    List.map
-        (\card ->
-            case card of
-                ShakingCard c ->
-                    HiddenCard { c | revealTime = 0 }
+updateLevelShakeConfig : LevelConfig -> LevelConfig
+updateLevelShakeConfig config =
+    let
+        currentLevel =
+            config.currentLevel
 
-                _ ->
-                    card
-        )
+        errorLimitReached =
+            currentLevel.incorrectSelections == config.errorThreshold
+
+        shakeTimeLeft =
+            currentLevel.shakeTimeElapsed < 2
+
+        updatedLevel =
+            { currentLevel
+                | shakeTimeElapsed =
+                    if errorLimitReached && shakeTimeLeft then
+                        currentLevel.shakeTimeElapsed + 1
+
+                    else
+                        currentLevel.shakeTimeElapsed
+            }
+    in
+    { config | currentLevel = updatedLevel }
 
 
 updateGameStatus : Model -> GameStatus
@@ -508,8 +479,8 @@ updateCardSelection id targets =
         )
 
 
-updateIncorrectSelections : CardId -> Model -> Level
-updateIncorrectSelections cardId model =
+updateIncorrectSelectionCount : CardId -> Model -> Level
+updateIncorrectSelectionCount cardId model =
     let
         level =
             model.config.currentLevel
@@ -547,62 +518,37 @@ updateIncorrectSelections cardId model =
     { level | incorrectSelections = updatedCount }
 
 
-cardIsATarget : CurrentTargets -> Card CardConfig -> Bool
-cardIsATarget ( target1, target2 ) card =
-    let
-        config =
-            getCardConfig card
-    in
-    List.member config.emoticon [ target1, target2 ]
+resetBoardFromShake : GameBoard -> GameBoard
+resetBoardFromShake =
+    List.map
+        (\card ->
+            case card of
+                ShakingCard c ->
+                    HiddenCard { c | revealTime = 0 }
 
-
-generateCardList : LevelConfig -> List Data.Emoticon -> GameBoard
-generateCardList config =
-    List.indexedMap
-        (\index emoticon ->
-            RevealedCard
-                { id = index
-                , emoticon = emoticon
-                , revealTime = 0
-                }
+                _ ->
+                    card
         )
 
 
-emoticonOf : Data.Emoticon -> GameBoard -> GameBoard
-emoticonOf target board =
-    board
-        |> List.filter
-            (\card ->
-                let
-                    config =
-                        getCardConfig card
-                in
-                config.emoticon == target
-            )
+resetConfigFromShuffle : LevelConfig -> LevelConfig
+resetConfigFromShuffle levelConf =
+    let
+        currentLevel =
+            levelConf.currentLevel
+
+        updatedLevel =
+            { currentLevel
+                | shakeTimeElapsed = 0
+                , incorrectSelections = 0
+            }
+    in
+    { levelConf | currentLevel = updatedLevel }
 
 
 generateRandomPair : Cmd Msg
 generateRandomPair =
     Random.generate PairOfCards <| Random.pair cardGenerator cardGenerator
-
-
-getCardConfig : Card CardConfig -> CardConfig
-getCardConfig card =
-    case card of
-        RevealedCard config ->
-            config
-
-        SelectedCard config ->
-            config
-
-        HiddenCard config ->
-            config
-
-        MatchedCard config ->
-            config
-
-        ShakingCard config ->
-            config
 
 
 generateNewCards : Model -> CurrentTargets -> ( Model, Cmd Msg )
@@ -632,6 +578,18 @@ generateNewCards model ( emoticon1, emoticon2 ) =
                         shuffle newList
                     )
             )
+        )
+
+
+generateCardList : LevelConfig -> List Data.Emoticon -> GameBoard
+generateCardList config =
+    List.indexedMap
+        (\index emoticon ->
+            RevealedCard
+                { id = index
+                , emoticon = emoticon
+                , revealTime = 0
+                }
         )
 
 
@@ -680,7 +638,7 @@ view model =
                             |> List.map
                                 (\card ->
                                     section [ class "pure-u-1-5" ]
-                                        [ viewCard card ]
+                                        [ lazy viewCard card ]
                                 )
                         )
                     , viewGameOver model.gameStatus
@@ -738,7 +696,7 @@ viewCard card =
             viewCardItem [ ( "is-selected", True ) ] config
 
         HiddenCard config ->
-            viewCardItem [ ( "is-fliped", True ) ] config
+            viewCardItem [ ( "is-flipped", True ) ] config
 
         RevealedCard config ->
             viewCardItem [] config
@@ -747,7 +705,7 @@ viewCard card =
             viewCardItem [ ( "is-matched", True ) ] config
 
         ShakingCard config ->
-            viewCardItem [ ( "is-fliped", True ), ( "is-shaking", True ) ] config
+            viewCardItem [ ( "is-flipped", True ), ( "is-shaking", True ) ] config
 
 
 viewCardItem : CssClassList -> CardConfig -> Html Msg
@@ -800,7 +758,7 @@ viewSidebar model =
             GameStarted ->
                 emojis
 
-            GamePaused ->
+            GameCutScene ->
                 emojis
 
             _ ->
@@ -850,6 +808,28 @@ viewEmojiTargets model =
 -- Utilities
 
 
+emoticonOf : Data.Emoticon -> GameBoard -> GameBoard
+emoticonOf target board =
+    board
+        |> List.filter
+            (\card ->
+                let
+                    config =
+                        getCardConfig card
+                in
+                config.emoticon == target
+            )
+
+
+cardIsATarget : CurrentTargets -> Card CardConfig -> Bool
+cardIsATarget ( target1, target2 ) card =
+    let
+        config =
+            getCardConfig card
+    in
+    List.member config.emoticon [ target1, target2 ]
+
+
 countNumberOfTargets : Data.Emoticon -> GameBoard -> Int
 countNumberOfTargets target board =
     board
@@ -871,6 +851,29 @@ countNumberOfTargets target board =
                         acc + 1
             )
             0
+
+
+getCardConfig : Card CardConfig -> CardConfig
+getCardConfig card =
+    case card of
+        RevealedCard config ->
+            config
+
+        SelectedCard config ->
+            config
+
+        HiddenCard config ->
+            config
+
+        MatchedCard config ->
+            config
+
+        ShakingCard config ->
+            config
+
+
+type alias CssClassList =
+    List ( String, Bool )
 
 
 cssClassNames : CssClassList -> String
