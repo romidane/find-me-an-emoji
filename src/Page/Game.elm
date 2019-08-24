@@ -1,6 +1,7 @@
 module Page.Game exposing (Model, Msg(..), init, subscriptions, update, view)
 
 import Browser
+import Data.Game as Data
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
@@ -19,7 +20,7 @@ import Time
 
 
 type alias CurrentTargets =
-    ( Emoticon, Emoticon )
+    ( Data.Emoticon, Data.Emoticon )
 
 
 type alias GameBoard =
@@ -36,7 +37,7 @@ type alias CssClassList =
 
 type alias CardConfig =
     { id : CardId
-    , emoticon : Emoticon
+    , emoticon : Data.Emoticon
     , revealTime : Int
     }
 
@@ -82,23 +83,6 @@ type Card config
     | ShakingCard config
 
 
-type Emoticon
-    = GrinningFace
-    | TearsOfJoyFace
-    | SmirkingFace
-    | LookOfTriumphFace
-    | RelievedFace
-    | KissingFace
-    | HeartShapedEyesFace
-    | UnamusedFace
-    | SleepyFace
-    | FearfulFace
-    | StuckOutTongueClosedEyesFace
-    | DizzyFace
-    | SeeNoEvilMonkey
-    | NoFace
-
-
 defaultGameConfig : LevelConfig
 defaultGameConfig =
     { currentLevel =
@@ -111,7 +95,7 @@ defaultGameConfig =
     , sneakPeakTime = 4
     , numberOfCards = 25
     , numberOfTargets = 3
-    , currentTargets = ( NoFace, NoFace )
+    , currentTargets = ( Data.NoFace, Data.NoFace )
     }
 
 
@@ -136,7 +120,7 @@ init _ =
 
 type Msg
     = NewGame
-    | NewCards (List Emoticon)
+    | NewCards (List Data.Emoticon)
     | PairOfCards CurrentTargets
     | SelectCard CardId
     | Tick Time.Posix
@@ -270,8 +254,8 @@ updateLevelCompletion model =
             model.config.currentTargets
 
         allTargetsComplete =
-            listOfEmoticonsOf target1 model.board
-                |> List.append (listOfEmoticonsOf target2 model.board)
+            emoticonOf target1 model.board
+                |> List.append (emoticonOf target2 model.board)
                 |> List.all
                     (\card ->
                         case card of
@@ -440,7 +424,7 @@ cardIsATarget ( target1, target2 ) card =
     List.member config.emoticon [ target1, target2 ]
 
 
-generateCardList : LevelConfig -> List Emoticon -> GameBoard
+generateCardList : LevelConfig -> List Data.Emoticon -> GameBoard
 generateCardList config =
     List.indexedMap
         (\index emoticon ->
@@ -452,8 +436,8 @@ generateCardList config =
         )
 
 
-listOfEmoticonsOf : Emoticon -> GameBoard -> GameBoard
-listOfEmoticonsOf target board =
+emoticonOf : Data.Emoticon -> GameBoard -> GameBoard
+emoticonOf target board =
     board
         |> List.filter
             (\card ->
@@ -515,42 +499,26 @@ generateNewCards model ( emoticon1, emoticon2 ) =
                         in
                         shuffle newList
                     )
+                |> Random.andThen shuffle
             )
         )
 
 
-listOfEmoticons : List Emoticon
-listOfEmoticons =
-    [ TearsOfJoyFace
-    , SmirkingFace
-    , LookOfTriumphFace
-    , RelievedFace
-    , KissingFace
-    , HeartShapedEyesFace
-    , UnamusedFace
-    , SleepyFace
-    , FearfulFace
-    , StuckOutTongueClosedEyesFace
-    , DizzyFace
-    , GrinningFace
-    ]
-
-
-cardGenerator : Random.Generator Emoticon
+cardGenerator : Random.Generator Data.Emoticon
 cardGenerator =
-    Random.uniform GrinningFace listOfEmoticons
+    Random.uniform Data.GrinningFace Data.listOfEmoticons
 
 
-weightedCardGenerator : CurrentTargets -> Random.Generator Emoticon
+weightedCardGenerator : CurrentTargets -> Random.Generator Data.Emoticon
 weightedCardGenerator ( emoticon1, emoticon2 ) =
     let
         list =
-            listOfEmoticons
+            Data.listOfEmoticons
                 |> List.filter (\emoticon -> not (emoticon == emoticon1))
                 |> List.filter (\emoticon -> not (emoticon == emoticon2))
                 |> List.map
                     (\emoticon ->
-                        ( 20, emoticon )
+                        ( 10, emoticon )
                     )
     in
     Random.weighted ( 0, emoticon1 ) list
@@ -632,52 +600,6 @@ viewGameOver status =
             text ""
 
 
-viewEmoticon : Emoticon -> String
-viewEmoticon emoticon =
-    case emoticon of
-        NoFace ->
-            ""
-
-        GrinningFace ->
-            "😁"
-
-        TearsOfJoyFace ->
-            "😂"
-
-        SmirkingFace ->
-            "😏"
-
-        LookOfTriumphFace ->
-            "😤"
-
-        RelievedFace ->
-            "😌"
-
-        KissingFace ->
-            "😚"
-
-        HeartShapedEyesFace ->
-            "😍"
-
-        UnamusedFace ->
-            "😒"
-
-        SleepyFace ->
-            "😪"
-
-        FearfulFace ->
-            "😨"
-
-        StuckOutTongueClosedEyesFace ->
-            "😝"
-
-        DizzyFace ->
-            "😵"
-
-        SeeNoEvilMonkey ->
-            "🙈"
-
-
 viewCard : Card CardConfig -> Html Msg
 viewCard card =
     case card of
@@ -708,11 +630,11 @@ viewCardItem css config =
         [ div [ class "c-card-inner" ]
             [ div [ class "c-card-front" ]
                 [ span []
-                    [ text (viewEmoticon config.emoticon) ]
+                    [ text (Data.viewEmoticon config.emoticon) ]
                 ]
             , div [ class "c-card-back" ]
                 [ span []
-                    [ text (viewEmoticon SeeNoEvilMonkey) ]
+                    [ text (Data.viewEmoticon Data.SeeNoEvilMonkey) ]
                 ]
             ]
         ]
@@ -773,13 +695,13 @@ viewEmojiTargets model =
             ]
         , div [ class "pure-u-1-2" ]
             [ span [ class "c-icon__emoticon" ]
-                [ text (viewEmoticon emoticon1) ]
+                [ text (Data.viewEmoticon emoticon1) ]
             , span [ class "c-icon__badge" ]
                 [ text (String.fromInt <| countNumberOfTargets emoticon1 model.board) ]
             ]
         , div [ class "pure-u-1-2" ]
             [ span [ class "c-icon__emoticon" ]
-                [ text (viewEmoticon emoticon2) ]
+                [ text (Data.viewEmoticon emoticon2) ]
             , span [ class "c-icon__badge" ]
                 [ text (String.fromInt <| countNumberOfTargets emoticon2 model.board) ]
             ]
@@ -790,7 +712,7 @@ viewEmojiTargets model =
 -- Utilities
 
 
-countNumberOfTargets : Emoticon -> GameBoard -> Int
+countNumberOfTargets : Data.Emoticon -> GameBoard -> Int
 countNumberOfTargets target board =
     board
         |> List.filter
