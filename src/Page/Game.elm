@@ -174,7 +174,7 @@ update msg model =
         ShuffleCards list ->
             ( { model
                 | gameStatus = GameStarted
-                , board = resetBoardFromShake list
+                , board = resetBoardFromShake model.config list
                 , config = resetConfigFromShuffle model.config
               }
             , Cmd.none
@@ -518,13 +518,13 @@ updateIncorrectSelectionCount cardId model =
     { level | incorrectSelections = updatedCount }
 
 
-resetBoardFromShake : GameBoard -> GameBoard
-resetBoardFromShake =
+resetBoardFromShake : LevelConfig -> GameBoard -> GameBoard
+resetBoardFromShake config =
     List.map
         (\card ->
             case card of
                 ShakingCard c ->
-                    HiddenCard { c | revealTime = 0 }
+                    RevealedCard { c | revealTime = config.sneakPeakTime // 2 }
 
                 _ ->
                     card
@@ -541,6 +541,7 @@ resetConfigFromShuffle levelConf =
             { currentLevel
                 | shakeTimeElapsed = 0
                 , incorrectSelections = 0
+                , timeElapsed = currentLevel.timeElapsed - 1
             }
     in
     { levelConf | currentLevel = updatedLevel }
