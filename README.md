@@ -14,3 +14,9 @@ The goal was to build a single page application as well as a game using elm.
 ## Running the app in development mode
 `elm-app start`
 
+
+
+## Todo
+
+- Write tests
+- Add a scoring system
