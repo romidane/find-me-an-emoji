@@ -51,6 +51,10 @@ body {
 }
 
 .c-heading-bravo {
+  font-size: 1.2em;
+}
+
+.c-heading-charlie {
   font-size: 1em;
 }
 
@@ -60,15 +64,13 @@ body {
   }
 }
 
-.c-heading-charlie {
-  font-size: 1em;
-}
-
 /* ---------- Buttons ---------- */
 
 .c-btn--pink {
   background-color: #e700ab;
   color: #f6f9e5;
+  font-size: 0.9em;
+  font-weight: normal;
 }
 
 .c-btn-group {
@@ -78,6 +80,12 @@ body {
 
 .c-btn-group__text {
   display: inline-block;
+}
+
+@media screen and (min-width: 48em) {
+  .c-btn--pink {
+    font-size: initial;
+  }
 }
 
 /* ---------- Page menu ---------- */
@@ -251,6 +259,9 @@ body {
 
 .c-sidebar__instruction-container {
   text-align: center;
+}
+
+.c-sidebar__instruction-container .c-text {
   display: none;
 }
 
@@ -263,7 +274,7 @@ body {
   border-radius: 50%;
   background-color: #e700ab;
   color: #fff;
-  display: block;
+  display: inline-block;
   text-align: center;
   width: 20px;
   height: 20px;
@@ -280,7 +291,7 @@ body {
     border-top-right-radius: none;
   }
 
-  .c-sidebar__instruction-container {
+  .c-sidebar__instruction-container .c-text {
     display: block;
   }
 
@@ -293,6 +304,7 @@ body {
     width: 25px;
     height: 25px;
     line-height: 25px;
+    display: block;
   }
 }
 
@@ -308,6 +320,7 @@ body {
   overflow: hidden;
   will-change: width;
   pointer-events: auto;
+  margin-bottom: 10px;
 }
 
 .c-timer-meter > span {
@@ -324,6 +337,12 @@ body {
   left: 0;
   top: 0;
   transition: width 0.95s linear;
+}
+
+@media screen and (min-width: 48em) {
+  .c-timer-meter {
+    margin-bottom: initial;
+  }
 }
 
 /* Game over vail */

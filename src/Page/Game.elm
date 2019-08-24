@@ -109,7 +109,7 @@ defaultGameConfig =
         }
     , gameTime = 45
     , sneakPeakTime = 4
-    , numberOfCards = 20
+    , numberOfCards = 25
     , numberOfTargets = 3
     , currentTargets = ( NoFace, NoFace )
     }
@@ -291,7 +291,7 @@ updateLevelCompletion model =
 
 updateGameConfig : LevelConfig -> LevelConfig
 updateGameConfig config =
-    if config.gameTime > 25 && config.numberOfCards < 30 then
+    if config.gameTime > 25 && config.numberOfCards < 35 then
         { config
             | gameTime = config.gameTime - 3
             , numberOfCards = config.numberOfCards + 5
