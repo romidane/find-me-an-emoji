@@ -198,7 +198,7 @@ update msg model =
                         updatedLevel =
                             { currentLevel
                                 | shakeTimeElapsed =
-                                    if currentLevel.incorrectSelections == 3 && currentLevel.shakeTimeElapsed < 2 then
+                                    if currentLevel.incorrectSelections == 5 && currentLevel.shakeTimeElapsed < 2 then
                                         currentLevel.shakeTimeElapsed + 1
 
                                     else
@@ -285,7 +285,7 @@ update msg model =
                 updatedLevel =
                     { config | currentLevel = updateIncorrectSelections id model }
             in
-            if updatedLevel.currentLevel.incorrectSelections == 3 then
+            if updatedLevel.currentLevel.incorrectSelections == 5 then
                 ( { model
                     | config = updatedLevel
                     , gameStatus = GamePaused
