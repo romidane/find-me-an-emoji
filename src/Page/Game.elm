@@ -55,6 +55,7 @@ type alias LevelConfig =
     , numberOfCards : Int
     , currentLevel : Level
     , numberOfTargets : Int
+    , currentTargets : CurrentTargets
     }
 
 
@@ -63,7 +64,6 @@ type alias Model =
     , time : Time.Posix
     , zone : Time.Zone
     , config : LevelConfig
-    , currentTargets : CurrentTargets
     , gameStatus : GameStatus
     }
 
@@ -111,6 +111,7 @@ defaultGameConfig =
     , sneakPeakTime = 4
     , numberOfCards = 20
     , numberOfTargets = 3
+    , currentTargets = ( NoFace, NoFace )
     }
 
 
@@ -120,7 +121,6 @@ init _ =
       , time = Time.millisToPosix 0
       , zone = Time.utc
       , config = defaultGameConfig
-      , currentTargets = ( NoFace, NoFace )
       , gameStatus = GameIdle
       }
     , Cmd.batch
@@ -138,13 +138,14 @@ type Msg
     = NewGame
     | NewCards (List Emoticon)
     | PairOfCards CurrentTargets
-    | SelectCard Int
+    | SelectCard CardId
     | Tick Time.Posix
     | AdjustTimeZone Time.Zone
     | UpdateLevelCompletion
     | UpdateGameStatus
     | StartGame
     | NextLevel
+    | UpdateIncorrectSelections CardId
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -168,8 +169,11 @@ update msg model =
             ( { model | gameStatus = GameStarted }, Cmd.none )
 
         SelectCard id ->
-            ( { model | board = updateCardSelection id model.currentTargets model.board }
-            , Task.succeed UpdateLevelCompletion |> Task.perform identity
+            ( { model | board = updateCardSelection id model.config.currentTargets model.board }
+            , Cmd.batch
+                [ Task.succeed (UpdateIncorrectSelections id) |> Task.perform identity
+                , Task.succeed UpdateLevelCompletion |> Task.perform identity
+                ]
             )
 
         NewCards list ->
@@ -183,7 +187,7 @@ update msg model =
                     ( { model
                         | time = newTime
                         , config = updateLevelTime model.config
-                        , board = updateCardsTime model.config model.currentTargets model.board
+                        , board = updateCardsTime model.config model.config.currentTargets model.board
                       }
                     , Task.succeed UpdateGameStatus |> Task.perform identity
                     )
@@ -208,6 +212,16 @@ update msg model =
             ( { model | gameStatus = updateGameStatus model }
             , Cmd.none
             )
+
+        UpdateIncorrectSelections id ->
+            let
+                config =
+                    model.config
+
+                updatedLevel =
+                    { config | currentLevel = updateIncorrectSelections id model }
+            in
+            ( { model | config = updatedLevel }, Cmd.none )
 
 
 updateLevel : LevelConfig -> LevelConfig
@@ -253,7 +267,7 @@ updateLevelCompletion : Model -> ( Model, Cmd Msg )
 updateLevelCompletion model =
     let
         ( target1, target2 ) =
-            model.currentTargets
+            model.config.currentTargets
 
         allTargetsComplete =
             listOfEmoticonsOf target1 model.board
@@ -293,6 +307,9 @@ updateLevelTime config =
         { level, timeElapsed, sneakPeakTimeElapsed } =
             config.currentLevel
 
+        currLevel =
+            config.currentLevel
+
         time =
             if timeElapsed < config.gameTime && sneakPeakTimeElapsed >= config.sneakPeakTime then
                 timeElapsed + 1
@@ -306,8 +323,11 @@ updateLevelTime config =
 
             else
                 sneakPeakTimeElapsed
+
+        updatedLevel =
+            { currLevel | level = level, timeElapsed = time, sneakPeakTimeElapsed = sneakPeakTime }
     in
-    { config | currentLevel = Level level time sneakPeakTime 0 }
+    { config | currentLevel = updatedLevel }
 
 
 updateCardsTime : LevelConfig -> CurrentTargets -> GameBoard -> GameBoard
@@ -375,6 +395,42 @@ updateCardSelection id targets =
         )
 
 
+updateIncorrectSelections : CardId -> Model -> Level
+updateIncorrectSelections cardId model =
+    let
+        level =
+            model.config.currentLevel
+
+        anyMatched =
+            model.board
+                |> List.any
+                    (\card ->
+                        let
+                            config =
+                                getCardConfig card
+                        in
+                        if config.id == cardId then
+                            case card of
+                                MatchedCard _ ->
+                                    True
+
+                                _ ->
+                                    False
+
+                        else
+                            False
+                    )
+
+        updatedCount =
+            if anyMatched then
+                0
+
+            else
+                level.incorrectSelections + 1
+    in
+    { level | incorrectSelections = updatedCount }
+
+
 cardIsATarget : CurrentTargets -> Card CardConfig -> Bool
 cardIsATarget ( target1, target2 ) card =
     let
@@ -439,7 +495,14 @@ generateNewCards model ( emoticon1, emoticon2 ) =
         ( model, generateRandomPair )
 
     else
-        ( { model | currentTargets = ( emoticon1, emoticon2 ) }
+        let
+            config =
+                model.config
+
+            updatedConfig =
+                { config | currentTargets = ( emoticon1, emoticon2 ) }
+        in
+        ( { model | config = updatedConfig }
         , Random.generate NewCards
             (Random.list (model.config.numberOfCards - (model.config.numberOfTargets * 2)) (weightedCardGenerator ( emoticon1, emoticon2 ))
                 |> Random.andThen
@@ -538,7 +601,7 @@ viewStart model =
     in
     case model.gameStatus of
         GameIdle ->
-            div [ class (cssClassNames [ ( "c-game-start", True ) ]) ]
+            div [ class "c-game-start" ]
                 [ div [ class "c-game-start__content" ]
                     [ h2 [ class "c-heading-bravo u-no-margin" ] [ text <| "Level: " ++ String.fromInt level ]
                     , div [ class "c-game-start__instructions" ] [ viewEmojiTargets model ]
@@ -555,7 +618,7 @@ viewGameOver status =
     case status of
         GameOver ->
             div
-                [ class (cssClassNames [ ( "c-game-over", True ) ]) ]
+                [ class "c-game-over" ]
                 [ div [ class "c-game-over__content" ]
                     [ h2 [ class "u-no-margin-top" ]
                         [ text "Game Over" ]
@@ -699,6 +762,10 @@ viewTimer model =
 
 viewEmojiTargets : Model -> Html msg
 viewEmojiTargets model =
+    let
+        ( emoticon1, emoticon2 ) =
+            model.config.currentTargets
+    in
     div [ class "pure-g" ]
         [ div [ class "pure-u-1" ]
             [ p [ class "c-text" ]
@@ -706,15 +773,15 @@ viewEmojiTargets model =
             ]
         , div [ class "pure-u-1-2" ]
             [ span [ class "c-icon__emoticon" ]
-                [ text (viewEmoticon (Tuple.first model.currentTargets)) ]
+                [ text (viewEmoticon emoticon1) ]
             , span [ class "c-icon__badge" ]
-                [ text (String.fromInt <| countNumberOfTargets (Tuple.first model.currentTargets) model.board) ]
+                [ text (String.fromInt <| countNumberOfTargets emoticon1 model.board) ]
             ]
         , div [ class "pure-u-1-2" ]
             [ span [ class "c-icon__emoticon" ]
-                [ text (viewEmoticon (Tuple.second model.currentTargets)) ]
+                [ text (viewEmoticon emoticon2) ]
             , span [ class "c-icon__badge" ]
-                [ text (String.fromInt <| countNumberOfTargets (Tuple.second model.currentTargets) model.board) ]
+                [ text (String.fromInt <| countNumberOfTargets emoticon2 model.board) ]
             ]
         ]
 
