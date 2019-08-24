@@ -53,6 +53,7 @@ type alias Level =
 
 type alias LevelConfig =
     { gameTime : Int
+    , errorTreshold : Int
     , sneakPeakTime : Int
     , numberOfCards : Int
     , currentLevel : Level
@@ -94,6 +95,7 @@ defaultGameConfig =
         , incorrectSelections = 0
         , shakeTimeElapsed = 0
         }
+    , errorTreshold = 5
     , gameTime = 45
     , sneakPeakTime = 4
     , numberOfCards = 25
@@ -198,7 +200,7 @@ update msg model =
                         updatedLevel =
                             { currentLevel
                                 | shakeTimeElapsed =
-                                    if currentLevel.incorrectSelections == 5 && currentLevel.shakeTimeElapsed < 2 then
+                                    if currentLevel.incorrectSelections == model.config.errorTreshold && currentLevel.shakeTimeElapsed < 2 then
                                         currentLevel.shakeTimeElapsed + 1
 
                                     else
@@ -261,17 +263,7 @@ update msg model =
             in
             ( { model
                 | gameStatus = GameStarted
-                , board =
-                    list
-                        |> List.map
-                            (\card ->
-                                case card of
-                                    ShakingCard c ->
-                                        HiddenCard { c | revealTime = 0 }
-
-                                    _ ->
-                                        card
-                            )
+                , board = resetBoardFromShuffle list
                 , config = updatedConfig
               }
             , Cmd.none
@@ -285,7 +277,7 @@ update msg model =
                 updatedLevel =
                     { config | currentLevel = updateIncorrectSelections id model }
             in
-            if updatedLevel.currentLevel.incorrectSelections == 5 then
+            if updatedLevel.currentLevel.incorrectSelections == model.config.errorTreshold then
                 ( { model
                     | config = updatedLevel
                     , gameStatus = GamePaused
@@ -351,6 +343,19 @@ updateBoardToShake =
 
                 _ ->
                     ShakingCard conf
+        )
+
+
+resetBoardFromShuffle : GameBoard -> GameBoard
+resetBoardFromShuffle =
+    List.map
+        (\card ->
+            case card of
+                ShakingCard c ->
+                    HiddenCard { c | revealTime = 0 }
+
+                _ ->
+                    card
         )
 
 
