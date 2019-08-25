@@ -4,6 +4,7 @@ module Data.Game exposing
     , Level
     , LevelConfig
     , initialGame
+    , isLevelComplete
     , resetConfigFromShuffle
     , updateBoardToShake
     , updateCardSelection
@@ -17,7 +18,7 @@ module Data.Game exposing
     , updatedGameBoardAfterShake
     )
 
-import Data.Card exposing (..)
+import Data.Card exposing (Card(..), CardConfig, CardId, getCardConfig, shakeCard, updateCardMatching, updateCardTime)
 import Data.Emoticon exposing (Emoticon, blankEmoticon)
 
 
@@ -326,25 +327,6 @@ updateGameBoard game list =
                             }
                     )
     }
-
-
-updateGameLevelConfig : Game -> Game
-updateGameLevelConfig game =
-    let
-        levelConfig =
-            game.levelConfig
-
-        updatedLevelConfig =
-            if levelConfig.gameTime > 25 && levelConfig.numberOfCards < 35 then
-                { levelConfig
-                    | gameTime = levelConfig.gameTime - 3
-                    , numberOfCards = levelConfig.numberOfCards + 5
-                }
-
-            else
-                levelConfig
-    in
-    { game | levelConfig = updatedLevelConfig }
 
 
 resetConfigFromShuffle : Game -> Game
