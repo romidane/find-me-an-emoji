@@ -3,7 +3,7 @@ module Page.Game exposing (Model, Msg(..), init, subscriptions, update, view)
 import Browser
 import Data.Game as Data
 import Html exposing (Html, aside, button, div, h2, p, section, span, text)
-import Html.Attributes exposing (..)
+import Html.Attributes exposing (class, id, style)
 import Html.Events exposing (onClick)
 import Html.Lazy exposing (lazy)
 import List
@@ -252,23 +252,17 @@ update msg model =
 updateLevel : LevelConfig -> LevelConfig
 updateLevel config =
     let
-        currLevel =
+        currentLevel =
             config.currentLevel
 
         nextLevel =
-            currLevel.level + 1
+            currentLevel.level + 1
     in
     if modBy nextLevel 5 == 0 then
         { config
-            | currentLevel = { currLevel | level = nextLevel }
+            | currentLevel = { currentLevel | level = nextLevel }
             , gameTime = config.gameTime - 5
             , numberOfCards = config.numberOfCards + 5
-            , numberOfTargets =
-                if config.numberOfTargets > 1 then
-                    config.numberOfTargets - 1
-
-                else
-                    config.numberOfTargets
         }
 
     else
@@ -541,7 +535,6 @@ resetConfigFromShuffle levelConf =
             { currentLevel
                 | shakeTimeElapsed = 0
                 , incorrectSelections = 0
-                , timeElapsed = currentLevel.timeElapsed - 1
             }
     in
     { levelConf | currentLevel = updatedLevel }
@@ -694,26 +687,25 @@ viewCard : Card CardConfig -> Html Msg
 viewCard card =
     case card of
         SelectedCard config ->
-            viewCardItem [ ( "is-selected", True ) ] config
+            viewCardItem "is-selected" config
 
         HiddenCard config ->
-            viewCardItem [ ( "is-flipped", True ) ] config
+            viewCardItem "is-flipped" config
 
         RevealedCard config ->
-            viewCardItem [] config
+            viewCardItem "" config
 
         MatchedCard config ->
-            viewCardItem [ ( "is-matched", True ) ] config
+            viewCardItem "is-matched" config
 
         ShakingCard config ->
-            viewCardItem [ ( "is-flipped", True ), ( "is-shaking", True ) ] config
+            viewCardItem "is-flipped is-shaking" config
 
 
-viewCardItem : CssClassList -> CardConfig -> Html Msg
-viewCardItem css config =
+viewCardItem : String -> CardConfig -> Html Msg
+viewCardItem cssClasses config =
     div
-        [ class
-            (cssClassNames (List.append [ ( "c-card", True ) ] css))
+        [ class ("c-card " ++ cssClasses)
         , id (String.fromInt config.id)
         , onClick (SelectCard config.id)
         ]
@@ -871,22 +863,3 @@ getCardConfig card =
 
         ShakingCard config ->
             config
-
-
-type alias CssClassList =
-    List ( String, Bool )
-
-
-cssClassNames : CssClassList -> String
-cssClassNames list =
-    List.foldl
-        (\( key, value ) acc ->
-            if value == True then
-                acc ++ " " ++ key
-
-            else
-                acc
-        )
-        ""
-        list
-        |> String.trimLeft
