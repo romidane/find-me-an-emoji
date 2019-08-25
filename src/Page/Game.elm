@@ -7,6 +7,7 @@ import Html.Attributes exposing (class, id, style)
 import Html.Events exposing (onClick)
 import Html.Lazy exposing (lazy)
 import List
+import List.Extra as ListExtra
 import Random
 import Random.List exposing (shuffle)
 import String
@@ -381,7 +382,7 @@ updateLevelTime config =
         { level, timeElapsed, sneakPeakTimeElapsed, shakeTimeElapsed, incorrectSelections } =
             config.currentLevel
 
-        currLevel =
+        currentLevel =
             config.currentLevel
 
         time =
@@ -399,7 +400,7 @@ updateLevelTime config =
                 sneakPeakTimeElapsed
 
         updatedLevel =
-            { currLevel
+            { currentLevel
                 | level = level
                 , timeElapsed = time
                 , sneakPeakTimeElapsed = sneakPeakTime
@@ -564,12 +565,19 @@ generateNewCards model ( emoticon1, emoticon2 ) =
                 |> Random.andThen
                     (\weightedList ->
                         let
+                            list1 =
+                                List.repeat model.config.numberOfTargets emoticon1
+
+                            list2 =
+                                List.repeat model.config.numberOfTargets emoticon2
+
                             newList =
                                 weightedList
-                                    |> List.append (List.repeat model.config.numberOfTargets emoticon1)
-                                    |> List.append (List.repeat model.config.numberOfTargets emoticon2)
+                                    |> ListExtra.interweave list1
+                                    |> List.reverse
+                                    |> ListExtra.interweave list2
                         in
-                        shuffle newList
+                        newList |> shuffle
                     )
             )
         )
