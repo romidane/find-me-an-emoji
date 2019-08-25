@@ -1,4 +1,4 @@
-module Page.Game exposing (Model, Msg(..), init, subscriptions, update, view)
+module Page.Game exposing (Model, Msg, init, subscriptions, update, view)
 
 import Browser
 import Data.Game as Data
@@ -44,6 +44,13 @@ type alias Level =
     , sneakPeakTimeElapsed : Int
     , incorrectSelections : Int
     , shakeTimeElapsed : Int
+    }
+
+
+type alias Game =
+    { board : GameBoard
+    , level : LevelConfig
+    , status : GameStatus
     }
 
 
@@ -262,7 +269,6 @@ updateLevel config =
     if modBy nextLevel 5 == 0 then
         { config
             | currentLevel = { currentLevel | level = nextLevel }
-            , gameTime = config.gameTime - 5
             , numberOfCards = config.numberOfCards + 5
         }
 
@@ -280,7 +286,15 @@ updateLevel config =
                     , timeElapsed = 0
                 }
         in
-        { config | currentLevel = updatedLevel }
+        { config
+            | currentLevel = updatedLevel
+            , gameTime =
+                if config.gameTime > 30 then
+                    config.gameTime - 3
+
+                else
+                    config.gameTime
+        }
 
 
 updateBoardToShake : GameBoard -> GameBoard
