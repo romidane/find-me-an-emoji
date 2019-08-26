@@ -19,10 +19,12 @@ The app can be found here
 
 [View the app](https://awesome-snyder-5d610e.netlify.com/)
 
+![alt Screenshot](/public/screenshot.png)
+
 ## Running the app in development mode
 `elm-app start`
 
-then navigate to 
+then navigate to
 `http://localhost:3000`
 
 
