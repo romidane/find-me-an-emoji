@@ -95,7 +95,13 @@ updateGameLevel game =
             game.levelConfig
 
         updatedLevel =
-            { currentLevel | number = currentLevel.number + 1 }
+            { currentLevel
+                | number = currentLevel.number + 1
+                , sneakPeakTimeElapsed = 0
+                , incorrectSelections = 0
+                , shakeTimeElapsed = 0
+                , timeElapsed = 0
+            }
     in
     if modBy updatedLevel.number 5 == 0 then
         let
@@ -109,14 +115,6 @@ updateGameLevel game =
 
     else
         let
-            updatedLevelReset =
-                { updatedLevel
-                    | sneakPeakTimeElapsed = 0
-                    , incorrectSelections = 0
-                    , shakeTimeElapsed = 0
-                    , timeElapsed = 0
-                }
-
             updatedLevelConfig =
                 { currentLevelConfig
                     | gameTime =
@@ -128,7 +126,7 @@ updateGameLevel game =
                 }
         in
         { game
-            | level = updatedLevelReset
+            | level = updatedLevel
             , levelConfig = updatedLevelConfig
         }
 
